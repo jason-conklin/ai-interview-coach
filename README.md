@@ -1,4 +1,17 @@
 # AI Interview Coach
+3. Open a PR with screenshots or recordings if the UI changes.
+2. Run `pre-commit run --all-files` before pushing.
+## Local dev
+
+```bash
+python -m venv .venv
+pip install -r backend/requirements.txt
+npm ci --prefix frontend
+npm run dev --prefix frontend
+```
+
+3. Open a PR with screenshots or recordings if the UI changes.
+# AI Interview Coach
 
 AI Interview Coach is a full-stack practice environment that pairs a FastAPI backend with a modern React/Vite frontend. Candidates can run mock interviews by role, record their answers, receive rubric-driven AI feedback, and review previous sessions.
 
