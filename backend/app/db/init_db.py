@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
+from app.db.base import Base
 from app.models.enums import QuestionCategory
 from app.models.tables import Question, Role
 
@@ -74,7 +75,9 @@ async def load_seed_data(session: AsyncSession, seed_path: Path) -> None:
 async def main() -> None:
     engine = create_async_engine(settings.database_url, echo=False)
     async_session = async_sessionmaker(engine, expire_on_commit=False)
-    seed_path = Path(__file__).resolve().parent / "seed_roles_and_questions.json"
+    async with engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    seed_path = Path(__file__).resolve().parent.parent / "seeds" / "seed_roles_and_questions.json"
     async with async_session() as session:
         try:
             await load_seed_data(session, seed_path)
