@@ -1,4 +1,5 @@
 import type { Question } from "../../api/types";
+import { getRoleLevelLabel } from "../../utils/levels";
 import { QuestionCategoryBadge } from "./QuestionCategoryBadge";
 
 type QuestionPromptProps = {
@@ -12,6 +13,14 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => (
       <span className="rounded-full bg-slate-100 px-3 py-1 text-xs dark:bg-slate-800">
         Difficulty {question.difficulty}/5
       </span>
+      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs dark:bg-slate-800">
+        Level {getRoleLevelLabel(question.level)}
+      </span>
+      {question.requires_code ? (
+        <span className="rounded-full bg-brand/10 px-3 py-1 text-xs font-semibold text-brand dark:bg-brand-light/20 dark:text-brand-light">
+          Coding exercise
+        </span>
+      ) : null}
       {question.expected_duration_sec ? (
         <span className="rounded-full bg-slate-100 px-3 py-1 text-xs dark:bg-slate-800">
           {Math.round(question.expected_duration_sec / 60)} min suggested

@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from app.models.enums import SessionTier
+from app.models.enums import RoleLevel, SessionTier
 from app.schemas.question import QuestionRead
 from app.schemas.role import RoleRead
 from app.services.evaluation import tier_for_score
@@ -13,6 +13,7 @@ from app.services.evaluation import tier_for_score
 
 class SessionCreate(BaseModel):
     role_slug: str = Field(..., examples=["software-developer"])
+    level: RoleLevel = Field(default=RoleLevel.ENTRY)
 
 
 class SessionRead(BaseModel):
@@ -20,6 +21,7 @@ class SessionRead(BaseModel):
 
     id: int
     role: RoleRead
+    level: RoleLevel
     started_at: datetime
     ended_at: Optional[datetime] = None
     overall_score: Optional[float] = None
@@ -86,6 +88,7 @@ class HistoryItem(BaseModel):
 
     id: int
     role: RoleRead
+    level: RoleLevel
     started_at: datetime
     ended_at: Optional[datetime] = None
     overall_score: Optional[float] = None

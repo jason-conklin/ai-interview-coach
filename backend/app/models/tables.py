@@ -3,12 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import JSON, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, JSON, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import QuestionCategory, SessionTier
+from app.models.enums import QuestionCategory, RoleLevel, SessionTier
 
 
 class Role(Base):
@@ -30,8 +30,10 @@ class Question(Base):
     role_id: Mapped[int] = mapped_column(ForeignKey("role.id", ondelete="CASCADE"), nullable=False, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     category: Mapped[QuestionCategory] = mapped_column(Enum(QuestionCategory, native_enum=False), nullable=False)
+    level: Mapped[RoleLevel] = mapped_column(Enum(RoleLevel, native_enum=False), nullable=False, default=RoleLevel.ENTRY)
     difficulty: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     expected_duration_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    requires_code: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     keywords: Mapped[List[str]] = mapped_column(JSON, default=list)
 
     role: Mapped["Role"] = relationship(back_populates="questions")
@@ -43,6 +45,7 @@ class Session(Base):
     role_id: Mapped[int] = mapped_column(ForeignKey("role.id", ondelete="RESTRICT"), nullable=False, index=True)
     started_at: Mapped[datetime] = mapped_column(default=func.now(), nullable=False)
     ended_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    level: Mapped[RoleLevel] = mapped_column(Enum(RoleLevel, native_enum=False), nullable=False, default=RoleLevel.ENTRY)
     summary_tier: Mapped[Optional[SessionTier]] = mapped_column(Enum(SessionTier, native_enum=False), nullable=True)
     overall_score: Mapped[Optional[float]] = mapped_column(nullable=True)
 

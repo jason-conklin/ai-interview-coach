@@ -30,7 +30,7 @@ async def create_session(
     if not role:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Role not found.")
 
-    new_session = Session(role_id=role.id)
+    new_session = Session(role_id=role.id, level=payload.level)
     db.add(new_session)
     await db.flush()
     await db.refresh(new_session, attribute_names=["role"])
@@ -68,6 +68,11 @@ async def submit_answer(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Question does not belong to the session role.",
+        )
+    if question.level != session_obj.level:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Question level does not match the session level.",
         )
 
     duration_ms = int((payload.ended_at - payload.started_at).total_seconds() * 1000)

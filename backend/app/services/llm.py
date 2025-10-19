@@ -44,7 +44,11 @@ class LLMEvaluationService:
         question_text: str,
         category: QuestionCategory,
         role_name: str,
+        requires_code: bool = False,
     ) -> EvaluationPayload:
+        if requires_code:
+            return self._code_evaluation(answer_text=answer_text, question_text=question_text)
+
         if self._should_stub or not self._client:
             logger.warning("OPENAI_API_KEY not configured; returning offline evaluation.")
             return self._offline_evaluation(answer_text=answer_text, category=category)
@@ -104,6 +108,76 @@ class LLMEvaluationService:
         except (OpenAIError, ValueError, KeyError, json.JSONDecodeError) as exc:
             logger.error("llm_evaluation_failed", error=str(exc))
             return self._offline_evaluation(answer_text=answer_text, category=category)
+
+    def _code_evaluation(self, *, answer_text: str, question_text: str) -> EvaluationPayload:
+        normalized = answer_text.strip()
+        if not normalized:
+            return EvaluationPayload(
+                score=2.0,
+                feedback_markdown=
+                "No code was provided. Share a compilable snippet and explain the approach to receive targeted feedback.",
+                rubric={
+                    "structure": 1.0,
+                    "readability": 1.0,
+                    "correctness": 1.0,
+                    "tests": 0.0,
+                },
+                suggested_improvements=[
+                    "Include a working code snippet for the core logic.",
+                    "Describe how you would validate the solution with tests.",
+                ],
+                readiness_tier=tier_for_score(2.0),
+            )
+
+        has_function = any(token in normalized for token in ["def ", "function ", "class "])
+        has_control_flow = any(keyword in normalized for keyword in ["for ", "while ", "if ", "match "])
+        mentions_tests = any(keyword in normalized.lower() for keyword in ["assert", "test", "unit"])
+        explains = len([line for line in normalized.splitlines() if line.strip().startswith(("#", "//"))]) > 0 or "explain" in normalized.lower()
+        length_bonus = min(3, max(0, len(normalized.splitlines()) // 4))
+
+        score = 4.0
+        if has_function:
+            score += 2.5
+        if has_control_flow:
+            score += 1.5
+        if mentions_tests:
+            score += 1.0
+        if explains:
+            score += 0.5
+        score += length_bonus
+        score = round(min(score, 10.0), 2)
+
+        rubric = {
+            "structure": 10.0 if has_function else 6.0,
+            "readability": 8.0 if explains else 5.0,
+            "correctness": 7.0 if has_control_flow else 4.0,
+            "tests": 6.0 if mentions_tests else 2.0,
+        }
+
+        improvements = []
+        if not has_function:
+            improvements.append("Show the core logic wrapped in a function or class so it can be reused.")
+        if not has_control_flow:
+            improvements.append("Demonstrate control flow (loops or conditionals) to cover the full behaviour.")
+        if not mentions_tests:
+            improvements.append("Outline how you would test the solution or add assertions.")
+        if not explains:
+            improvements.append("Add comments or a short explanation describing key steps.")
+        if not improvements:
+            improvements.append("Consider edge cases and mention how you would handle them.")
+
+        feedback = (
+            "Code response detected. Based on heuristic review, your structure earns {structure:.1f}/10. "
+            "Share runnable code with tests when possible for stronger feedback."
+        ).format(structure=rubric["structure"])
+
+        return EvaluationPayload(
+            score=score,
+            feedback_markdown=feedback,
+            rubric=rubric,
+            suggested_improvements=improvements[:3],
+            readiness_tier=tier_for_score(score),
+        )
 
     def _offline_evaluation(
         self,

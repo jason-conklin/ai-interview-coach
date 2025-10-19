@@ -1,14 +1,29 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { createSession, fetchRoles } from "../api/interview";
-import type { Role } from "../api/types";
+import type { Role, RoleLevel } from "../api/types";
 import { RoleCard } from "../components/RoleCard";
 import { useInterviewSession } from "../hooks/useInterviewSession";
+import { ROLE_LEVEL_LABELS } from "../utils/levels";
+
+const LEVEL_OPTIONS: Array<{ value: RoleLevel; label: string }> = (
+  Object.entries(ROLE_LEVEL_LABELS) as Array<[RoleLevel, string]>
+).map(([value, label]) => ({ value, label }));
+
+const LEVEL_HINTS: Record<RoleLevel, string> = {
+  internship: "Introductory walkthroughs with simpler, scoped coding prompts.",
+  entry: "Practical delivery stories plus foundational technical drills.",
+  mid: "Systems thinking with follow-up questions on tradeoffs.",
+  senior: "Complex architectures, leadership scenarios, and deeper code reviews.",
+  staff: "High-stakes strategy, cross-team impact, and production-hardening exercises.",
+};
 
 export const LandingPage = () => {
   const navigate = useNavigate();
   const { startSession } = useInterviewSession();
+  const [selectedLevel, setSelectedLevel] = useState<RoleLevel>("entry");
 
   const { data: roles, isLoading, isError } = useQuery({
     queryKey: ["roles"],
@@ -16,15 +31,17 @@ export const LandingPage = () => {
   });
 
   const { mutateAsync: createSessionMutation, isPending } = useMutation({
-    mutationFn: (role: Role) => createSession({ role_slug: role.slug }),
+    mutationFn: ({ role, level }: { role: Role; level: RoleLevel }) =>
+      createSession({ role_slug: role.slug, level }),
   });
 
   const handleSelectRole = async (role: Role) => {
-    const session = await createSessionMutation(role);
+    const session = await createSessionMutation({ role, level: selectedLevel });
     startSession({
       id: session.id,
       roleSlug: role.slug,
       roleName: role.name,
+      level: session.level,
       startedAt: session.started_at,
     });
     navigate(`/interview/${session.id}`, { replace: true });
@@ -43,10 +60,36 @@ export const LandingPage = () => {
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+            Choose a role to begin
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Select the seniority that best reflects your current target. Questions tune difficulty and
+            coding depth automatically from this setting.
+          </p>
+        </div>
+        <label className="ml-auto flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+          Level
+          <select
+            value={selectedLevel}
+            onChange={(event) => setSelectedLevel(event.target.value as RoleLevel)}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition focus:border-brand focus:outline-none dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          >
+            {LEVEL_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="text-xs text-slate-400 dark:text-slate-500">
+          {LEVEL_HINTS[selectedLevel]}
+        </p>
+      </div>
+
       <div>
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
-          Choose a role to begin
-        </h2>
         {isLoading ? (
           <p className="mt-4 text-sm text-slate-500">Loading roles...</p>
         ) : isError ? (
@@ -59,7 +102,7 @@ export const LandingPage = () => {
               <RoleCard
                 key={role.id}
                 role={role}
-                onSelect={(selectedRole) => handleSelectRole(selectedRole)}
+                onSelect={(selectedRole) => void handleSelectRole(selectedRole)}
               />
             ))}
           </div>
@@ -84,7 +127,7 @@ export const LandingPage = () => {
           onClick={() => {
             const firstRole = roles?.[0];
             if (firstRole) {
-              handleSelectRole(firstRole);
+              void handleSelectRole(firstRole);
             }
           }}
           className="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-brand/70"

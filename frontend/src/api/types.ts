@@ -2,6 +2,8 @@ export type QuestionCategory = "behavioral" | "technical" | "role_specific";
 
 export type SessionTier = "Exploring" | "Emerging" | "Ready";
 
+export type RoleLevel = "internship" | "entry" | "mid" | "senior" | "staff";
+
 export interface Role {
   id: number;
   name: string;
@@ -14,8 +16,10 @@ export interface Question {
   role_id: number;
   text: string;
   category: QuestionCategory;
+  level: RoleLevel;
   difficulty: number;
   expected_duration_sec?: number | null;
+  requires_code: boolean;
   keywords: string[];
 }
 
@@ -42,6 +46,7 @@ export interface Answer {
 export interface Session {
   id: number;
   role: Role;
+  level: RoleLevel;
   started_at: string;
   ended_at?: string | null;
   overall_score?: number | null;

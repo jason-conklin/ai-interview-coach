@@ -11,3 +11,11 @@ class SessionTier(str, Enum):
     EXPLORING = "Exploring"
     EMERGING = "Emerging"
     READY = "Ready"
+
+
+class RoleLevel(str, Enum):
+    INTERNSHIP = "internship"
+    ENTRY = "entry"
+    MID = "mid"
+    SENIOR = "senior"
+    STAFF = "staff"

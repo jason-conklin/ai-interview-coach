@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.config import settings
 from app.db.base import Base
-from app.models.enums import QuestionCategory
+from app.models.enums import QuestionCategory, RoleLevel
 from app.models.tables import Question, Role
 
 logger = structlog.get_logger(__name__)
@@ -62,8 +62,10 @@ async def load_seed_data(session: AsyncSession, seed_path: Path) -> None:
             role_id=role.id,
             text=entry["text"],
             category=QuestionCategory(entry["category"]),
+            level=RoleLevel(entry.get("level", "entry")),
             difficulty=entry["difficulty"],
             expected_duration_sec=entry.get("expected_duration_sec"),
+            requires_code=bool(entry.get("requires_code", False)),
             keywords=entry.get("keywords", []),
         )
         session.add(question)

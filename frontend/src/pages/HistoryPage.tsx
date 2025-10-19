@@ -3,9 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { fetchHistory, fetchRoles } from "../api/interview";
-import type { HistoryItem, Role } from "../api/types";
+import type { HistoryItem, Role, RoleLevel } from "../api/types";
 import { useInterviewSession } from "../hooks/useInterviewSession";
 import { formatDateTime, formatDuration, formatScore, readinessBadgeColor } from "../utils/formatters";
+import { ROLE_LEVEL_LABELS, getRoleLevelLabel } from "../utils/levels";
+
+type LevelFilter = RoleLevel | "all";
 
 export const HistoryPage = () => {
   const { clearSession } = useInterviewSession();
@@ -13,11 +16,16 @@ export const HistoryPage = () => {
     queryKey: ["roles"],
     queryFn: fetchRoles,
   });
-  const [selectedRole, setSelectedRole] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<string>("");
+  const [selectedLevel, setSelectedLevel] = useState<LevelFilter>("all");
 
   const historyQuery = useQuery({
-    queryKey: ["history", selectedRole],
-    queryFn: () => fetchHistory(selectedRole ? { role: selectedRole } : undefined),
+    queryKey: ["history", selectedRole, selectedLevel],
+    queryFn: () =>
+      fetchHistory({
+        role: selectedRole || undefined,
+        level: selectedLevel === "all" ? undefined : selectedLevel,
+      }),
   });
 
   const roles = rolesQuery.data ?? [];
@@ -29,7 +37,7 @@ export const HistoryPage = () => {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">Practice history</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Review past sessions, see readiness trends, and drill into detailed feedback.
+            Review past sessions, filter by role and level, and drill into detailed feedback.
           </p>
         </div>
         <button
@@ -51,13 +59,30 @@ export const HistoryPage = () => {
         <select
           id="role-filter"
           className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-          value={selectedRole ?? ""}
-          onChange={(event) => setSelectedRole(event.target.value || null)}
+          value={selectedRole}
+          onChange={(event) => setSelectedRole(event.target.value)}
         >
           <option value="">All roles</option>
           {roles.map((role: Role) => (
             <option key={role.id} value={role.slug}>
               {role.name}
+            </option>
+          ))}
+        </select>
+
+        <label htmlFor="level-filter" className="text-sm text-slate-600 dark:text-slate-300">
+          Level
+        </label>
+        <select
+          id="level-filter"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+          value={selectedLevel}
+          onChange={(event) => setSelectedLevel((event.target.value || "all") as LevelFilter)}
+        >
+          <option value="all">All levels</option>
+          {Object.entries(ROLE_LEVEL_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
             </option>
           ))}
         </select>
@@ -69,6 +94,7 @@ export const HistoryPage = () => {
             <tr>
               <th className="px-4 py-3 text-left">Date</th>
               <th className="px-4 py-3 text-left">Role</th>
+              <th className="px-4 py-3 text-left">Level</th>
               <th className="px-4 py-3 text-left">Score</th>
               <th className="px-4 py-3 text-left">Tier</th>
               <th className="px-4 py-3 text-left">Duration</th>
@@ -78,13 +104,13 @@ export const HistoryPage = () => {
           <tbody className="divide-y divide-slate-200 text-sm dark:divide-slate-800">
             {historyQuery.isLoading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={7} className="px-4 py-6 text-center text-slate-500">
                   Loading history...
                 </td>
               </tr>
             ) : sessions.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-500 dark:text-slate-400">
+                <td colSpan={7} className="px-4 py-6 text-center text-slate-500 dark:text-slate-400">
                   No sessions found yet. Start practicing to see your progress timeline.
                 </td>
               </tr>
@@ -96,6 +122,9 @@ export const HistoryPage = () => {
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                     {session.role.name}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                    {getRoleLevelLabel(session.level)}
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                     {formatScore(session.overall_score, 1)}
@@ -133,3 +162,4 @@ export const HistoryPage = () => {
     </section>
   );
 };
+

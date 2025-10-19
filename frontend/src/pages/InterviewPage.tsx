@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { evaluateAnswer, fetchQuestions, fetchSessionDetail, submitAnswer } from "../api/interview";
-import type { Evaluation, Question } from "../api/types";
+import type { Evaluation, Question, RoleLevel } from "../api/types";
 import { AnswerComposer } from "../components/interview/AnswerComposer";
 import { FeedbackPanel } from "../components/interview/FeedbackPanel";
 import { QuestionPrompt } from "../components/interview/QuestionPrompt";
@@ -11,6 +11,7 @@ import { SessionStats } from "../components/interview/SessionStats";
 import { TimerDisplay } from "../components/interview/TimerDisplay";
 import { useInterviewSession } from "../hooks/useInterviewSession";
 import { formatDateTime } from "../utils/formatters";
+import { getRoleLevelLabel } from "../utils/levels";
 
 const categoryCycle = ["behavioral", "technical", "role_specific"] as const;
 
@@ -47,24 +48,29 @@ export const InterviewPage = () => {
         id: sessionQuery.data.id,
         roleName: sessionQuery.data.role.name,
         roleSlug: sessionQuery.data.role.slug,
+        level: sessionQuery.data.level,
         startedAt: sessionQuery.data.started_at,
       });
     }
   }, [activeSession, sessionQuery.data, startSession]);
 
   const effectiveRoleSlug = activeSession?.roleSlug ?? sessionQuery.data?.role.slug;
+  const activeLevel: RoleLevel = useMemo(() => {
+    return activeSession?.level ?? sessionQuery.data?.level ?? "entry";
+  }, [activeSession?.level, sessionQuery.data?.level]);
 
   const activeCategory = useMemo(() => {
     return categoryCycle[questionVersion % categoryCycle.length];
   }, [questionVersion]);
 
   const questionQuery = useQuery({
-    queryKey: ["question", effectiveRoleSlug, activeCategory, questionVersion],
+    queryKey: ["question", effectiveRoleSlug, activeCategory, activeLevel, questionVersion],
     queryFn: async () => {
       if (!effectiveRoleSlug) return null;
       const results = await fetchQuestions({
         role: effectiveRoleSlug,
         category: activeCategory,
+        level: activeLevel,
         limit: 1,
       });
       return results[0] ?? null;
@@ -77,7 +83,7 @@ export const InterviewPage = () => {
       setQuestion(questionQuery.data);
       setAnswerText("");
       setLatestEvaluation(null);
-       setErrorMessage(null);
+      setErrorMessage(null);
       const now = new Date();
       setStartTime(now);
       setElapsedSeconds(0);
@@ -143,7 +149,7 @@ export const InterviewPage = () => {
             {sessionQuery.data?.role.name ?? "Interview Session"}
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Started {formatDateTime(sessionQuery.data?.started_at)}
+            Level: {getRoleLevelLabel(activeLevel)} - Started {formatDateTime(sessionQuery.data?.started_at)}
           </p>
         </div>
         <TimerDisplay
@@ -183,6 +189,7 @@ export const InterviewPage = () => {
         onSubmit={() => submitAnswerMutation.mutate()}
         isSubmitting={submitAnswerMutation.isPending}
         disabled={!question}
+        requiresCode={Boolean(question?.requires_code)}
       />
 
       {errorMessage ? (
@@ -211,3 +218,4 @@ export const InterviewPage = () => {
     </div>
   );
 };
+

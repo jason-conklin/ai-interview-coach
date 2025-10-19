@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import type { SessionDetail } from "../../api/types";
 import { formatDuration, formatScore, readinessBadgeColor } from "../../utils/formatters";
+import { getRoleLevelLabel } from "../../utils/levels";
 
 type SessionStatsProps = {
   session: SessionDetail | null;
@@ -34,7 +35,13 @@ export const SessionStats = ({ session }: SessionStatsProps) => {
   }, [session]);
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-3">
+    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-4">
+      <div>
+        <span className="text-xs uppercase text-slate-400">Level</span>
+        <p className="mt-1 text-lg font-semibold text-slate-900 dark:text-white">
+          {getRoleLevelLabel(session?.level ?? "entry")}
+        </p>
+      </div>
       <div>
         <span className="text-xs uppercase text-slate-400">Overall tier</span>
         <div

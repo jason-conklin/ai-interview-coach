@@ -7,6 +7,7 @@ import type {
   Role,
   Session,
   SessionDetail,
+  RoleLevel,
 } from "./types";
 
 export const fetchRoles = async (): Promise<Role[]> => {
@@ -17,13 +18,14 @@ export const fetchRoles = async (): Promise<Role[]> => {
 export const fetchQuestions = async (params: {
   role: string;
   category?: string;
+  level?: RoleLevel;
   limit?: number;
 }): Promise<Question[]> => {
   const response = await apiClient.get<Question[]>("/questions", { params });
   return response.data;
 };
 
-export const createSession = async (payload: { role_slug: string }): Promise<Session> => {
+export const createSession = async (payload: { role_slug: string; level: RoleLevel }): Promise<Session> => {
   const response = await apiClient.post<Session>("/sessions", payload);
   return response.data;
 };
@@ -52,7 +54,11 @@ export const fetchSessionDetail = async (sessionId: number): Promise<SessionDeta
   return response.data;
 };
 
-export const fetchHistory = async (params?: { role?: string; limit?: number }): Promise<HistoryItem[]> => {
+export const fetchHistory = async (params?: {
+  role?: string;
+  level?: RoleLevel;
+  limit?: number;
+}): Promise<HistoryItem[]> => {
   const response = await apiClient.get<HistoryItem[]>("/history", { params });
   return response.data;
 };

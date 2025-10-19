@@ -41,6 +41,7 @@ async def evaluate_answer(payload: EvaluationRequest, db: DbSessionDep) -> Evalu
         question_text=question.text,
         category=question.category,
         role_name=role.name,
+        requires_code=question.requires_code,
     )
 
     if answer.evaluation:

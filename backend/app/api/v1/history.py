@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.dependencies import DbSessionDep
+from app.models.enums import RoleLevel
 from app.models.tables import Role, Session
 from app.schemas.session import HistoryItem
 
@@ -23,6 +24,7 @@ router = APIRouter()
 async def list_session_history(
     db: DbSessionDep,
     role: Annotated[Optional[str], Query(description="Filter by role slug")] = None,
+    level: Annotated[Optional[RoleLevel], Query(description="Filter by role level")] = None,
     limit: Annotated[int, Query(ge=1, le=50, description="Maximum sessions to return")] = 25,
 ) -> List[HistoryItem]:
     stmt = (
@@ -33,6 +35,8 @@ async def list_session_history(
     )
     if role:
         stmt = stmt.join(Session.role).where(Role.slug == role)
+    if level:
+        stmt = stmt.where(Session.level == level)
 
     result = await db.execute(stmt)
     sessions = result.scalars().all()
