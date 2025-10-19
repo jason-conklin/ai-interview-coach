@@ -68,13 +68,21 @@ async def evaluate_answer(payload: EvaluationRequest, db: DbSessionDep) -> Evalu
 
 
 async def _update_session_rollup(*, db: AsyncSession, session_obj: Session) -> None:
-    await db.refresh(
-        session_obj,
-        attribute_names=["answers"],
+    stmt = (
+        select(Session)
+        .options(
+            selectinload(Session.answers).selectinload(Answer.evaluation),
+        )
+        .where(Session.id == session_obj.id)
     )
+    result = await db.execute(stmt)
+    session_with_answers = result.scalar_one_or_none()
+    if not session_with_answers:
+        return
+
     scores = [
         answer.evaluation.score
-        for answer in session_obj.answers
+        for answer in session_with_answers.answers
         if answer.evaluation
     ]
     if not scores:

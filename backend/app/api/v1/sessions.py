@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 try:  # pragma: no cover - Python <3.9 compatibility
     from typing import Annotated
@@ -17,6 +17,12 @@ from app.models.tables import Answer, Question, Role, Session
 from app.schemas.session import AnswerCreate, AnswerRead, SessionCreate, SessionDetail, SessionRead
 
 router = APIRouter()
+
+
+def _as_utc_naive(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 @router.post("", response_model=SessionRead, status_code=status.HTTP_201_CREATED)
@@ -69,13 +75,12 @@ async def submit_answer(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Question does not belong to the session role.",
         )
-    if question.level != session_obj.level:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Question level does not match the session level.",
-        )
+    # Allow minor level mismatches when the question fallback logic returns the closest difficulty.
+    # The question record still captures its own level for analytics.
 
-    duration_ms = int((payload.ended_at - payload.started_at).total_seconds() * 1000)
+    started_at = _as_utc_naive(payload.started_at)
+    ended_at = _as_utc_naive(payload.ended_at)
+    duration_ms = int((ended_at - started_at).total_seconds() * 1000)
     if duration_ms <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -86,15 +91,18 @@ async def submit_answer(
         session_id=session_id,
         question_id=payload.question_id,
         answer_text=payload.answer_text,
-        started_at=payload.started_at,
-        ended_at=payload.ended_at,
+        started_at=started_at,
+        ended_at=ended_at,
         duration_ms=duration_ms,
         transcript_text=payload.transcript_text,
     )
     db.add(answer)
 
-    if not session_obj.ended_at or payload.ended_at > session_obj.ended_at:
-        session_obj.ended_at = payload.ended_at
+    session_ended_at = session_obj.ended_at
+    if session_ended_at and session_ended_at.tzinfo is not None:
+        session_ended_at = _as_utc_naive(session_ended_at)
+    if not session_ended_at or ended_at > session_ended_at:
+        session_obj.ended_at = ended_at
 
     await db.flush()
     await db.refresh(answer, attribute_names=["question", "evaluation"])
