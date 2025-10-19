@@ -4,6 +4,8 @@ import json
 import os
 from typing import Any, Dict, List, Optional
 
+import re
+
 import structlog
 
 try:
@@ -45,17 +47,32 @@ class LLMEvaluationService:
         category: QuestionCategory,
         role_name: str,
         requires_code: bool = False,
+        question_keywords: Optional[List[str]] = None,
     ) -> EvaluationPayload:
         if requires_code:
-            return self._code_evaluation(answer_text=answer_text, question_text=question_text)
+            return self._code_evaluation(
+                answer_text=answer_text,
+                question_text=question_text,
+                question_keywords=question_keywords,
+            )
 
         if self._should_stub or not self._client:
             logger.warning("OPENAI_API_KEY not configured; returning offline evaluation.")
-            return self._offline_evaluation(answer_text=answer_text, category=category)
+            return self._offline_evaluation(
+                answer_text=answer_text,
+                question_text=question_text,
+                category=category,
+                keywords=question_keywords,
+            )
 
         if AsyncOpenAI is None:
             logger.warning("openai package not installed; using offline evaluation.")
-            return self._offline_evaluation(answer_text=answer_text, category=category)
+            return self._offline_evaluation(
+                answer_text=answer_text,
+                question_text=question_text,
+                category=category,
+                keywords=question_keywords,
+            )
 
         try:
             response = await self._client.responses.create(
@@ -107,15 +124,24 @@ class LLMEvaluationService:
             )
         except (OpenAIError, ValueError, KeyError, json.JSONDecodeError) as exc:
             logger.error("llm_evaluation_failed", error=str(exc))
-            return self._offline_evaluation(answer_text=answer_text, category=category)
+            return self._offline_evaluation(
+                answer_text=answer_text,
+                question_text=question_text,
+                category=category,
+                keywords=question_keywords,
+            )
 
-    def _code_evaluation(self, *, answer_text: str, question_text: str) -> EvaluationPayload:
+
+    def _code_evaluation(
+        self, *, answer_text: str, question_text: str, question_keywords: Optional[List[str]] = None
+    ) -> EvaluationPayload:
         normalized = answer_text.strip()
         if not normalized:
             return EvaluationPayload(
                 score=2.0,
-                feedback_markdown=
-                "No code was provided. Share a compilable snippet and explain the approach to receive targeted feedback.",
+                feedback_markdown=(
+                    "No code was provided. Share a compilable snippet and explain the approach to receive targeted feedback."
+                ),
                 rubric={
                     "structure": 1.0,
                     "readability": 1.0,
@@ -129,10 +155,13 @@ class LLMEvaluationService:
                 readiness_tier=tier_for_score(2.0),
             )
 
-        has_function = any(token in normalized for token in ["def ", "function ", "class "])
-        has_control_flow = any(keyword in normalized for keyword in ["for ", "while ", "if ", "match "])
-        mentions_tests = any(keyword in normalized.lower() for keyword in ["assert", "test", "unit"])
-        explains = len([line for line in normalized.splitlines() if line.strip().startswith(("#", "//"))]) > 0 or "explain" in normalized.lower()
+        lowered = normalized.lower()
+        has_function = any(token in lowered for token in ["def ", "function ", "class "])
+        has_control_flow = any(keyword in lowered for keyword in ["for ", "while ", "if ", "match "])
+        mentions_tests = any(keyword in lowered for keyword in ["assert", "test", "unit", "expect"])
+        documents_examples = "input" in lowered and "output" in lowered
+        mentions_complexity = "o(" in lowered or "complexity" in lowered or "big-o" in lowered
+        includes_comments = any(line.strip().startswith(("#", "//")) for line in normalized.splitlines())
         length_bonus = min(3, max(0, len(normalized.splitlines()) // 4))
 
         score = 4.0
@@ -142,70 +171,165 @@ class LLMEvaluationService:
             score += 1.5
         if mentions_tests:
             score += 1.0
-        if explains:
+        if includes_comments:
+            score += 0.5
+        if mentions_complexity:
+            score += 0.5
+        if documents_examples:
             score += 0.5
         score += length_bonus
         score = round(min(score, 10.0), 2)
 
         rubric = {
             "structure": 10.0 if has_function else 6.0,
-            "readability": 8.0 if explains else 5.0,
-            "correctness": 7.0 if has_control_flow else 4.0,
-            "tests": 6.0 if mentions_tests else 2.0,
+            "readability": 8.5 if includes_comments else 5.5,
+            "correctness": 7.5 if has_control_flow else 4.5,
+            "tests": 7.0 if mentions_tests else 3.0,
         }
 
-        improvements = []
+        improvements: List[str] = []
         if not has_function:
-            improvements.append("Show the core logic wrapped in a function or class so it can be reused.")
+            improvements.append("Wrap the solution in a named function or class to match production patterns.")
         if not has_control_flow:
-            improvements.append("Demonstrate control flow (loops or conditionals) to cover the full behaviour.")
+            improvements.append("Demonstrate the core algorithm with loops or conditionals to prove correctness.")
         if not mentions_tests:
-            improvements.append("Outline how you would test the solution or add assertions.")
-        if not explains:
-            improvements.append("Add comments or a short explanation describing key steps.")
+            improvements.append("Show how you would test the code, e.g. with assertions or unit test snippets.")
+        if not documents_examples:
+            examples_hint = "Reference sample inputs/outputs from the prompt to prove the code works."
+            improvements.append(examples_hint)
+        if not mentions_complexity:
+            improvements.append("State the time/space complexity to show you understand performance trade-offs.")
+        if question_keywords and not any(kw.lower() in lowered for kw in question_keywords):
+            improvements.append("Mention domain specifics such as " + ", ".join(question_keywords[:2]) + " to tailor the answer.")
         if not improvements:
-            improvements.append("Consider edge cases and mention how you would handle them.")
+            improvements.append("Consider additional edge cases and annotate the code with expected outcomes.")
 
-        feedback = (
-            "Code response detected. Based on heuristic review, your structure earns {structure:.1f}/10. "
-            "Share runnable code with tests when possible for stronger feedback."
-        ).format(structure=rubric["structure"])
+        # Ensure suggestions are concise and unique
+        seen = set()
+        filtered: List[str] = []
+        for item in improvements:
+            key = item.strip()
+            if key and key not in seen:
+                filtered.append(key)
+                seen.add(key)
+            if len(filtered) == 3:
+                break
+
+        focus_hint = question_keywords[0] if question_keywords else question_text.splitlines()[0].strip()
+        feedback_lines = [
+            "### Code Review Snapshot",
+            f"- Defines reusable function/class: {'yes' if has_function else 'no'}",
+            f"- Control flow present: {'yes' if has_control_flow else 'no'}",
+            f"- Tests or assertions mentioned: {'yes' if mentions_tests else 'no'}",
+            f"- Sample inputs/outputs referenced: {'yes' if documents_examples else 'no'}",
+            f"- Complexity discussed: {'yes' if mentions_complexity else 'no'}",
+            f"- Focus area from prompt: {focus_hint}",
+        ]
+        feedback_markdown = "\n".join(feedback_lines)
 
         return EvaluationPayload(
             score=score,
-            feedback_markdown=feedback,
+            feedback_markdown=feedback_markdown,
             rubric=rubric,
-            suggested_improvements=improvements[:3],
+            suggested_improvements=filtered,
             readiness_tier=tier_for_score(score),
         )
+
 
     def _offline_evaluation(
         self,
         *,
         answer_text: str,
+        question_text: str,
         category: QuestionCategory,
+        keywords: Optional[List[str]] = None,
     ) -> EvaluationPayload:
-        word_count = len(answer_text.split())
-        length_score = min(10.0, word_count / 20.0)
-        score = round(length_score, 2)
+        normalized = answer_text.strip()
+        if not normalized:
+            return EvaluationPayload(
+                score=2.5,
+                feedback_markdown=(
+                    "No response detected. Share your thought process so the coach can highlight strengths and next steps."
+                ),
+                rubric=default_rubric(category),
+                suggested_improvements=[
+                    "Draft a full response before submitting to receive targeted guidance.",
+                    "Reference the prompt directly and describe your approach step-by-step.",
+                ],
+                readiness_tier=tier_for_score(2.5),
+            )
+
+        lower_answer = normalized.lower()
+        word_count = len(normalized.split())
+        has_metrics = bool(re.search(r"\d", normalized))
+        star_hits = sum(1 for token in ["situation", "task", "action", "result", "impact"] if token in lower_answer)
+        mentions_customer = any(token in lower_answer for token in ["customer", "client", "stakeholder"])
+        references_role = False
+        if keywords:
+            references_role = any(kw.lower() in lower_answer for kw in keywords)
+        else:
+            focus_tokens = [token.strip().lower() for token in re.split(r"[,;]", question_text)[:3]]
+            references_role = any(token and token in lower_answer for token in focus_tokens)
+
+        length_score = min(5.0, word_count / 25.0)
+        structure_score = min(3.0, star_hits * 0.7)
+        metrics_score = 1.0 if has_metrics else 0.0
+        role_score = 1.0 if references_role else 0.3
+        total_score = round(min(10.0, 2.0 + length_score + structure_score + metrics_score + role_score), 2)
+
         rubric = default_rubric(category)
         for key in rubric:
-            rubric[key] = round(min(10.0, score * 0.9), 2)
-        feedback = (
-            "This automated evaluation is based on heuristic scoring because no LLM API key is configured. "
-            "Aim for concrete examples, structured storytelling, and measurable impact."
+            if key in {"clarity", "structure"}:
+                rubric[key] = round(min(10.0, 4 + structure_score * 2), 2)
+            elif key in {"specificity", "use_of_metrics", "metrics"}:
+                rubric[key] = round(3.0 + metrics_score * 6, 2)
+            else:
+                rubric[key] = round(min(10.0, 3 + length_score * 1.6), 2)
+
+        suggestions: List[str] = []
+        if star_hits < 3 and category == QuestionCategory.BEHAVIORAL:
+            suggestions.append("Walk through Situation, Task, Action, and Result so the story lands clearly.")
+        if not has_metrics:
+            suggestions.append("Quantify the outcome (e.g. % improvement, time saved) to underscore impact.")
+        if not references_role and keywords:
+            suggestions.append("Weave in domain specifics such as " + ", ".join(keywords[:2]) + " to show role alignment.")
+        if category == QuestionCategory.TECHNICAL and "complexity" not in lower_answer:
+            suggestions.append("State algorithmic complexity or trade-offs you considered.")
+        if not mentions_customer and category == QuestionCategory.BEHAVIORAL:
+            suggestions.append("Describe who benefited (customer, stakeholder, team) and how.")
+        if len(suggestions) < 3:
+            supplemental = [
+                "Call out key risks or mitigations you handled during the work.",
+                "Highlight the tools or frameworks you chose and why.",
+                "Outline a quick follow-up or learning you would apply next time.",
+            ]
+            for item in supplemental:
+                if item not in suggestions:
+                    suggestions.append(item)
+                if len(suggestions) == 3:
+                    break
+
+        focus_hint = (
+            ", ".join(keywords[:2])
+            if keywords
+            else question_text.splitlines()[0].strip().split(".")[0]
         )
-        improvements = [
-            "Structure your answer using Situation, Task, Action, Result where applicable.",
-            "Add quantifiable impact or metrics to demonstrate effectiveness.",
-            "Highlight specific tools or techniques relevant to the role.",
+        feedback_lines = [
+            "### Coaching Highlights",
+            f"- Word count: {word_count} (target 180-250 for fuller context)",
+            f"- STAR / structure cues spotted: {star_hits}",
+            f"- Metrics mentioned: {'yes' if has_metrics else 'no'}",
+            f"- Role or domain alignment: {'strong' if references_role else 'light'}",
+            f"- Prompt focus: {focus_hint}",
         ]
+        feedback_markdown = "\n".join(feedback_lines)
+
         return EvaluationPayload(
-            score=score,
-            feedback_markdown=feedback,
+            score=total_score,
+            feedback_markdown=feedback_markdown,
             rubric=rubric,
-            suggested_improvements=improvements,
-            readiness_tier=tier_for_score(score),
+            suggested_improvements=suggestions[:3],
+            readiness_tier=tier_for_score(total_score),
         )
 
 

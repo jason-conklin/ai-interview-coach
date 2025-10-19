@@ -693,7 +693,7 @@
   },
   {
     "role_slug": "software-developer",
-    "text": "Write a Python function `reverse_words` that reverses the order of words in a sentence while preserving spacing. Explain your approach.",
+    "text": "Write a Python function `reverse_words` that reverses the order of words in a sentence while preserving spacing. Explain your approach.\n\nExample:\nInput: 'hello  world'\nOutput: 'world  hello'\nExplain why the spacing is preserved and outline the string operations you would use.",
     "category": "technical",
     "level": "entry",
     "difficulty": 3,
@@ -708,7 +708,7 @@
   },
   {
     "role_slug": "software-developer",
-    "text": "Design a REST endpoint for tracking feature flags. Provide sample FastAPI code that defines the route and returns mock data.",
+    "text": "Design a REST endpoint for tracking feature flags. Provide sample FastAPI code that defines the route and returns mock data.\n\nExample:\nRequest: GET /api/v1/feature-flags?environment=staging\nResponse: {\"flags\": [{\"key\": \"checkout-redesign\", \"state\": \"enabled\"}, {\"key\": \"recommendations\", \"state\": \"disabled\"}]}\nHighlight how you would validate inputs and structure the response model.",
     "category": "technical",
     "level": "mid",
     "difficulty": 4,
@@ -722,7 +722,7 @@
   },
   {
     "role_slug": "full-stack-developer",
-    "text": "Implement a React component that debounces user input before calling an async search API. Show the hook or component code and describe key considerations.",
+    "text": "Implement a React component that debounces user input before calling an async search API. Show the hook or component code and describe key considerations.\n\nExample:\nUser types: h, he, hel, help (within 200ms)\nDebounced call: search('help') after 500ms of silence\nExplain how you would test that only the final value triggers the API call.",
     "category": "technical",
     "level": "mid",
     "difficulty": 4,
@@ -736,7 +736,7 @@
   },
   {
     "role_slug": "full-stack-developer",
-    "text": "Create a Next.js API route that proxies requests to an external weather service and caches responses in memory.",
+    "text": "Create a Next.js API route that proxies requests to an external weather service and caches responses in memory.\n\nExample:\nRequest: GET /api/weather?city=Berlin\nProxy target: https://api.weather.example.com/current?city=Berlin\nCached response snippet: {\"city\": \"Berlin\", \"tempC\": 12}\nDescribe cache invalidation and error handling strategies.",
     "category": "technical",
     "level": "senior",
     "difficulty": 5,
@@ -750,7 +750,7 @@
   },
   {
     "role_slug": "data-engineer",
-    "text": "Write a SQL query that finds the rolling 7-day average of daily active users grouped by product. Include the SQL window function.",
+    "text": "Write a SQL query that finds the rolling 7-day average of daily active users grouped by product. Include the SQL window function.\n\nExample table (daily_active_users):\n| dt        | product | active_users |\n|-----------|---------|--------------|\n| 2025-01-01| core    | 1200         |\n| 2025-01-02| core    | 1500         |\nTarget output row: dt=2025-01-07, product=core, rolling_avg=1385.7\nExplain how you would handle the first six days where the window is not yet full.",
     "category": "technical",
     "level": "mid",
     "difficulty": 4,
@@ -764,7 +764,7 @@
   },
   {
     "role_slug": "data-engineer",
-    "text": "Provide a Python snippet using Apache Spark (PySpark) to ingest JSON files from cloud storage, apply schema enforcement, and write partitioned Parquet output.",
+    "text": "Provide a Python snippet using Apache Spark (PySpark) to ingest JSON files from cloud storage, apply schema enforcement, and write partitioned Parquet output.\n\nExample:\nInput path: s3://analytics/raw/events/date=2025-01-01/*.json\nOutput path: s3://analytics/curated/events/\nPartition columns: country, event_date\nDiscuss how you would manage schema evolution and data quality checks.",
     "category": "role_specific",
     "level": "senior",
     "difficulty": 5,
@@ -778,7 +778,7 @@
   },
   {
     "role_slug": "cyber-analyst",
-    "text": "Create a Python script that parses a web server access log and detects IPs exceeding a request threshold within five minutes.",
+    "text": "Create a Python script that parses a web server access log and detects IPs exceeding a request threshold within five minutes.\n\nExample log snippet:\n192.168.1.2 - - [02/Jan/2025:10:00:10 +0000] \"GET /login HTTP/1.1\" 200\n192.168.1.2 - - [02/Jan/2025:10:02:08 +0000] \"GET /checkout HTTP/1.1\" 200\nThreshold: >100 requests / 5 minutes\nExpected output: ['192.168.1.2']\nExplain how you would parameterize the window and threshold.",
     "category": "technical",
     "level": "entry",
     "difficulty": 3,
@@ -792,7 +792,7 @@
   },
   {
     "role_slug": "cyber-analyst",
-    "text": "Write a Sigma-style detection rule in YAML that alerts on PowerShell execution with suspicious encoded commands. Explain each field.",
+    "text": "Write a Sigma-style detection rule in YAML that alerts on PowerShell execution with suspicious encoded commands. Explain each field.\n\nExample event:\nImage: powershell.exe\nCommandLine: powershell.exe -EncodedCommand SQBtAHAAcgBlAHMAcwAgACcAaABlAGwAbABvACc=\nShow how the rule would match this event and what metadata (title, tags, level) you would set.",
     "category": "role_specific",
     "level": "senior",
     "difficulty": 4,
@@ -806,7 +806,7 @@
   },
   {
     "role_slug": "software-developer",
-    "text": "Implement a function in Python that takes a string and returns true if it is a palindrome ignoring punctuation and casing. Provide a short note on the time complexity.",
+    "text": "Implement a function in Python that takes a string and returns true if it is a palindrome ignoring punctuation and casing. Provide a short note on the time complexity.\n\nExample:\nInput: \"A man, a plan, a canal: Panama\"\nOutput: True\nExplain the preprocessing steps and state the Big-O complexity.",
     "category": "technical",
     "level": "internship",
     "difficulty": 2,
@@ -834,7 +834,7 @@
   },
   {
     "role_slug": "software-developer",
-    "text": "Write a concurrent worker pool in Go that processes a channel of jobs with at-most-once semantics. Include code for graceful shutdown and metrics emission.",
+    "text": "Write a concurrent worker pool in Go that processes a channel of jobs with at-most-once semantics. Include code for graceful shutdown and metrics emission.\n\nExample:\nJobs channel receives: Job{ID:1}, Job{ID:2}\nExpected log output: processed job 1, processed job 2, shutdown complete\nDescribe how you would expose Prometheus metrics for in-flight and completed jobs.",
     "category": "technical",
     "level": "senior",
     "difficulty": 5,
@@ -848,7 +848,7 @@
   },
   {
     "role_slug": "full-stack-developer",
-    "text": "Build a minimal React component that debounces an input field and invokes a passed-in search callback after 500ms of inactivity. Show the component code and explain how you would unit test it.",
+    "text": "Build a minimal React component that debounces an input field and invokes a passed-in search callback after 500ms of inactivity. Show the component code and explain how you would unit test it.\n\nExample:\nInput sequence: ['t', 'to', 'tod', 'todo']\nExpected callback invocation: onSearch('todo') after 500ms pause\nMention how you would mock timers in Jest to assert debounce behavior.",
     "category": "technical",
     "level": "internship",
     "difficulty": 3,
@@ -876,7 +876,7 @@
   },
   {
     "role_slug": "data-engineer",
-    "text": "Write a SQL query that calculates a 7-day rolling average of daily active users per product_id from an events table. Include edge-case handling for the first week.",
+    "text": "Write a SQL query that calculates a 7-day rolling average of daily active users per product_id from an events table. Include edge-case handling for the first week.\n\nExample events table row:\n| event_date | product_id | active_users |\n| 2025-03-10 | 42         | 980          |\nExpected output: rolling_avg column that uses available days when <7 exist.\nDescribe how you would COALESCE or CASE to avoid NULL averages.",
     "category": "technical",
     "level": "internship",
     "difficulty": 3,
@@ -890,7 +890,7 @@
   },
   {
     "role_slug": "data-engineer",
-    "text": "Design a streaming architecture that reconciles late-arriving events. Provide pseudocode for a stateful Apache Flink operator that performs watermark-based aggregation and describe alerting for stuck partitions.",
+    "text": "Design a streaming architecture that reconciles late-arriving events. Provide pseudocode for a stateful Apache Flink operator that performs watermark-based aggregation and describe alerting for stuck partitions.\n\nExample scenario:\nSource emits events with timestamps up to 10 minutes late.\nExpected state: keyed by order_id with watermark gap of 5 minutes.\nExplain how you would emit side outputs for late data and trigger alerts when partitions stall for >15 minutes.",
     "category": "technical",
     "level": "staff",
     "difficulty": 5,
@@ -904,7 +904,7 @@
   },
   {
     "role_slug": "cyber-analyst",
-    "text": "Write a short Python script that parses a Windows security log and flags repeated failed logons from the same IP within 10 minutes. Explain how you would tune thresholds to minimize false positives.",
+    "text": "Write a short Python script that parses a Windows security log and flags repeated failed logons from the same IP within 10 minutes. Explain how you would tune thresholds to minimize false positives.\n\nExample log entries:\n2025-04-01T10:00:01Z Failed logon for user alice from 10.0.0.5\n2025-04-01T10:07:03Z Failed logon for user alice from 10.0.0.5\nThreshold: 5 failures / 10 minutes\nExpected alert: 10.0.0.5\nDiscuss how you would whitelist known scanners and adjust time windows.",
     "category": "technical",
     "level": "internship",
     "difficulty": 3,
@@ -918,7 +918,7 @@
   },
   {
     "role_slug": "cyber-analyst",
-    "text": "Walk through how you would codify threat hunting hypotheses into repeatable Jupyter notebooks. Include an example of a pandas query that joins process creation logs with threat intel indicators.",
+    "text": "Walk through how you would codify threat hunting hypotheses into repeatable Jupyter notebooks. Include an example of a pandas query that joins process creation logs with threat intel indicators.\n\nExample:\nprocesses_df columns: ['host', 'timestamp', 'process', 'sha256']\nthreat_intel_df columns: ['sha256', 'actor']\nExpected query: merge on sha256, filter actor.notnull()\nDescribe how you would parameterize notebook cells for reusable hunts.",
     "category": "technical",
     "level": "mid",
     "difficulty": 4,
