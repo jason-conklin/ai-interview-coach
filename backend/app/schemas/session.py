@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from app.models.enums import QuestionCategory, SessionTier
+from app.models.enums import SessionTier
 from app.schemas.question import QuestionRead
-from app.services.evaluation import tier_for_score
 from app.schemas.role import RoleRead
+from app.services.evaluation import tier_for_score
 
 
 class SessionCreate(BaseModel):
@@ -21,9 +21,9 @@ class SessionRead(BaseModel):
     id: int
     role: RoleRead
     started_at: datetime
-    ended_at: datetime | None = None
-    overall_score: float | None = None
-    summary_tier: SessionTier | None = None
+    ended_at: Optional[datetime] = None
+    overall_score: Optional[float] = None
+    summary_tier: Optional[SessionTier] = None
 
 
 class AnswerCreate(BaseModel):
@@ -31,19 +31,19 @@ class AnswerCreate(BaseModel):
     answer_text: str
     started_at: datetime
     ended_at: datetime
-    transcript_text: str | None = None
+    transcript_text: Optional[str] = None
 
 
 class RubricBreakdown(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    clarity: float | None = None
-    correctness: float | None = None
-    structure: float | None = None
-    relevance: float | None = None
-    specificity: float | None = None
-    metrics: float | None = None
-    additional: dict[str, Any] | None = None
+    clarity: Optional[float] = None
+    correctness: Optional[float] = None
+    structure: Optional[float] = None
+    relevance: Optional[float] = None
+    specificity: Optional[float] = None
+    metrics: Optional[float] = None
+    additional: Optional[Dict[str, Any]] = None
 
 
 class EvaluationRequest(BaseModel):
@@ -55,9 +55,9 @@ class EvaluationRead(BaseModel):
 
     id: int
     score: float
-    rubric: dict[str, Any]
+    rubric: Dict[str, Any]
     feedback_markdown: str
-    suggested_improvements: list[str]
+    suggested_improvements: List[str]
 
     @computed_field(return_type=SessionTier)
     def readiness_tier(self) -> SessionTier:
@@ -73,12 +73,12 @@ class AnswerRead(BaseModel):
     started_at: datetime
     ended_at: datetime
     duration_ms: int
-    transcript_text: str | None = None
-    evaluation: EvaluationRead | None = None
+    transcript_text: Optional[str] = None
+    evaluation: Optional[EvaluationRead] = None
 
 
 class SessionDetail(SessionRead):
-    answers: list[AnswerRead] = []
+    answers: List[AnswerRead] = []
 
 
 class HistoryItem(BaseModel):
@@ -87,10 +87,10 @@ class HistoryItem(BaseModel):
     id: int
     role: RoleRead
     started_at: datetime
-    ended_at: datetime | None = None
-    overall_score: float | None = None
-    summary_tier: SessionTier | None = None
+    ended_at: Optional[datetime] = None
+    overall_score: Optional[float] = None
+    summary_tier: Optional[SessionTier] = None
 
 
 class HistoryResponse(BaseModel):
-    items: list[HistoryItem]
+    items: List[HistoryItem]

@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 from pydantic import Field
 
 from app.schemas.common import ORMModel
@@ -10,5 +12,5 @@ class QuestionRead(ORMModel):
     text: str
     category: QuestionCategoryEnum
     difficulty: int = Field(ge=1, le=5)
-    expected_duration_sec: int | None = None
-    keywords: list[str] = []
+    expected_duration_sec: Optional[int] = None
+    keywords: List[str] = []

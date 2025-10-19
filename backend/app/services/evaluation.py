@@ -31,7 +31,7 @@ Instructions:
 """
 
 
-@dataclass(slots=True)
+@dataclass
 class EvaluationPayload:
     score: float
     feedback_markdown: str

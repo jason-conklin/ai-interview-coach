@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Annotated
+
+try:  # pragma: no cover - Python <3.9 compatibility
+    from typing import Annotated
+except ImportError:  # pragma: no cover
+    from typing_extensions import Annotated
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession

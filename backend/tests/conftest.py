@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import asyncio
+import os
 from pathlib import Path
-from typing import AsyncIterator
+from typing import AsyncIterator, Dict
 
-import pytest
+import pytest_asyncio
 from fastapi import FastAPI
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
@@ -19,22 +19,19 @@ from app.db.session import session_context
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> AsyncIterator[asyncio.AbstractEventLoop]:
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 async def _seed_database(session_factory: async_sessionmaker[AsyncSession]) -> None:
     seed_path = Path(__file__).resolve().parents[1] / "app" / "seeds" / "seed_roles_and_questions.json"
     async with session_factory() as session:
         await load_seed_data(session=session, seed_path=seed_path)
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture
 async def app_fixture() -> AsyncIterator[FastAPI]:
     settings.database_url = TEST_DATABASE_URL
+    settings.app_env = "test"
+    os.environ.setdefault("APP_ENV", "test")
+    os.environ.setdefault("CI", "true")
+
     engine = create_async_engine(
         TEST_DATABASE_URL,
         connect_args={"check_same_thread": False},
@@ -51,15 +48,17 @@ async def app_fixture() -> AsyncIterator[FastAPI]:
     application.include_router(api_router, prefix="/api/v1")
 
     @application.get("/healthz")
-    async def health() -> dict[str, str]:
+    async def health() -> Dict[str, str]:
         return {"status": "ok"}
 
-    yield application
+    try:
+        yield application
+    finally:
+        await engine.dispose()
 
-    await engine.dispose()
 
-
-@pytest.fixture()
+@pytest_asyncio.fixture
 async def client(app_fixture: FastAPI) -> AsyncIterator[AsyncClient]:
-    async with AsyncClient(app=app_fixture, base_url="http://testserver") as test_client:
+    transport = ASGITransport(app=app_fixture)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as test_client:
         yield test_client

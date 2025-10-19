@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-pytestmark = pytest.mark.anyio
+pytestmark = pytest.mark.asyncio
 
 
 async def test_session_creation_and_evaluation_flow(client):

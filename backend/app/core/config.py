@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import List
+from typing import List, Optional, Union
 
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     app_name: str = "AI Interview Coach"
     app_env: str = "development"
     database_url: str = "sqlite+aiosqlite:///./app.db"
-    openai_api_key: str | None = None
-    cors_origins: List[AnyHttpUrl] | List[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    openai_api_key: Optional[str] = None
+    cors_origins: Union[List[AnyHttpUrl], List[str]] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     @field_validator("cors_origins", mode="before")
     @classmethod

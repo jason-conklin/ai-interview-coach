@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import List, Optional
+
+try:  # pragma: no cover - Python <3.9 compatibility
+    from typing import Annotated
+except ImportError:  # pragma: no cover
+    from typing_extensions import Annotated
 
 from fastapi import APIRouter, Query
 from sqlalchemy import select
@@ -14,12 +19,12 @@ from app.schemas.session import HistoryItem
 router = APIRouter()
 
 
-@router.get("", response_model=list[HistoryItem], summary="List recent interview sessions")
+@router.get("", response_model=List[HistoryItem], summary="List recent interview sessions")
 async def list_session_history(
     db: DbSessionDep,
-    role: Annotated[str | None, Query(description="Filter by role slug")] = None,
+    role: Annotated[Optional[str], Query(description="Filter by role slug")] = None,
     limit: Annotated[int, Query(ge=1, le=50, description="Maximum sessions to return")] = 25,
-) -> list[HistoryItem]:
+) -> List[HistoryItem]:
     stmt = (
         select(Session)
         .options(selectinload(Session.role))

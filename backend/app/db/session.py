@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
@@ -16,7 +17,7 @@ class SessionContext:
     """Global session dependency container configured at startup."""
 
     def __init__(self) -> None:
-        self._session_factory: async_sessionmaker[AsyncSession] | None = None
+        self._session_factory: Optional[async_sessionmaker[AsyncSession]] = None
 
     def configure(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory

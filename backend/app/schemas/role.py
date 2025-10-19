@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 from app.schemas.common import ORMModel
 
 
@@ -5,8 +7,8 @@ class RoleRead(ORMModel):
     id: int
     name: str
     slug: str
-    description: str | None = None
+    description: Optional[str] = None
 
 
 class RoleListResponse(ORMModel):
-    roles: list[RoleRead]
+    roles: List[RoleRead]

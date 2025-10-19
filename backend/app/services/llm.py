@@ -1,10 +1,16 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+import os
+from typing import Any, Dict, List, Optional
 
 import structlog
-from openai import AsyncOpenAI, OpenAIError
+
+try:
+    from openai import AsyncOpenAI, OpenAIError
+except ImportError:  # pragma: no cover - optional dependency
+    AsyncOpenAI = None  # type: ignore[assignment]
+    OpenAIError = Exception  # type: ignore[misc,assignment]
 
 from app.core.config import settings
 from app.models.enums import QuestionCategory
@@ -19,10 +25,17 @@ logger = structlog.get_logger(__name__)
 
 
 class LLMEvaluationService:
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(self, api_key: Optional[str] = None) -> None:
         api_key = api_key or settings.openai_api_key
         self._api_key = api_key
-        self._client = AsyncOpenAI(api_key=api_key) if api_key else None
+        self._should_stub = _should_use_stub()
+
+        if self._should_stub:
+            self._client = None
+        elif AsyncOpenAI is not None:
+            self._client = AsyncOpenAI(api_key=api_key) if api_key else None
+        else:
+            self._client = None
 
     async def evaluate_answer(
         self,
@@ -32,8 +45,12 @@ class LLMEvaluationService:
         category: QuestionCategory,
         role_name: str,
     ) -> EvaluationPayload:
-        if not self._client:
+        if self._should_stub or not self._client:
             logger.warning("OPENAI_API_KEY not configured; returning offline evaluation.")
+            return self._offline_evaluation(answer_text=answer_text, category=category)
+
+        if AsyncOpenAI is None:
+            logger.warning("openai package not installed; using offline evaluation.")
             return self._offline_evaluation(answer_text=answer_text, category=category)
 
         try:
@@ -116,3 +133,12 @@ class LLMEvaluationService:
             suggested_improvements=improvements,
             readiness_tier=tier_for_score(score),
         )
+
+
+def _should_use_stub() -> bool:
+    env_flag = (settings.app_env or "").lower()
+    if env_flag in {"test", "ci"}:
+        return True
+    if os.environ.get("CI", "").lower() == "true":
+        return True
+    return False

@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import List, Optional
+
+try:  # pragma: no cover - Python <3.9 compatibility
+    from typing import Annotated
+except ImportError:  # pragma: no cover
+    from typing_extensions import Annotated
 
 from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
@@ -14,13 +19,13 @@ from app.schemas.question import QuestionRead
 router = APIRouter()
 
 
-@router.get("", response_model=list[QuestionRead], summary="Fetch interview questions")
+@router.get("", response_model=List[QuestionRead], summary="Fetch interview questions")
 async def list_questions(
     session: DbSessionDep,
     role: Annotated[str, Query(description="Role slug to filter questions")],
-    category: Annotated[QuestionCategory | None, Query(description="Question category filter")] = None,
+    category: Annotated[Optional[QuestionCategory], Query(description="Question category filter")] = None,
     limit: Annotated[int, Query(ge=1, le=10, description="Number of questions to return")] = 1,
-) -> list[QuestionRead]:
+) -> List[QuestionRead]:
     role_stmt = select(Role).where(Role.slug == role)
     role_result = await session.execute(role_stmt)
     role_obj = role_result.scalar_one_or_none()
