@@ -1,0 +1,39 @@
+# Node
+/node_modules/
+pnpm-lock.yaml
+yarn.lock
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.vite/
+/frontend/dist/
+
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+.pytest_cache/
+.mypy_cache/
+/backend/.venv/
+/backend/.ruff_cache/
+/backend/app.db
+
+# Env
+.env
+.env.*
+
+# Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Coverage / reports
+coverage.xml
+htmlcov/
+.coverage
+
+# Alembic
+/backend/alembic/versions/__pycache__/
+
+# Docker
+*.log

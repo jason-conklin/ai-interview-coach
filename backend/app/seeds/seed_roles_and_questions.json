@@ -1,0 +1,394 @@
+[
+  {
+    "role_slug": "software-developer",
+    "text": "Tell me about a time you inherited code with little documentation. How did you safely add a new feature?",
+    "category": "behavioral",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["legacy", "documentation", "refactoring", "feature"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "Describe how you break down a large feature request into deliverables for a two-week sprint.",
+    "category": "behavioral",
+    "difficulty": 2,
+    "expected_duration_sec": 120,
+    "keywords": ["planning", "agile", "sprint", "deliverables"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "How would you design an in-memory cache with time-based eviction?",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 180,
+    "keywords": ["cache", "eviction", "data structures", "ttl"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "Walk me through how a RESTful POST request travels through a typical web application stack.",
+    "category": "technical",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["http", "rest", "backend", "request lifecycle"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "What signals tell you that a codebase needs refactoring, and how do you align that with delivery timelines?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["refactoring", "technical debt", "stakeholders"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "Explain the tradeoffs between optimistic and pessimistic locking.",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 180,
+    "keywords": ["concurrency", "transactions", "locking", "databases"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "Share a time you resolved a production incident that required coordination across teams.",
+    "category": "behavioral",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["incident", "communication", "ownership"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "How do you ensure code quality when shipping features rapidly?",
+    "category": "role_specific",
+    "difficulty": 2,
+    "expected_duration_sec": 120,
+    "keywords": ["code quality", "testing", "reviews", "automation"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "Design a rate limiter for an API that handles burst traffic gracefully.",
+    "category": "technical",
+    "difficulty": 5,
+    "expected_duration_sec": 210,
+    "keywords": ["rate limiting", "throttling", "api gateway"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "Describe a decision you made where you intentionally delayed writing tests. How did you mitigate risk?",
+    "category": "behavioral",
+    "difficulty": 2,
+    "expected_duration_sec": 120,
+    "keywords": ["testing", "tradeoff", "risk"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "What strategies do you use to keep dependencies current without disrupting the roadmap?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["dependencies", "maintenance", "roadmap"]
+  },
+  {
+    "role_slug": "software-developer",
+    "text": "Explain how garbage collection works in your preferred programming language.",
+    "category": "technical",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["garbage collection", "memory management"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "Describe a time you improved the load performance of a customer-facing page end-to-end.",
+    "category": "behavioral",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["performance", "frontend", "optimization", "metrics"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "How do you decide whether to render a feature on the client, the server, or both?",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["rendering", "csr", "ssr", "hydration"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "What process do you follow to introduce a design system into an existing product?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["design system", "component library", "adoption"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "Explain how you secure data flowing between a single-page app and its backend.",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 180,
+    "keywords": ["security", "api", "authentication", "https"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "Tell me about a release where a frontend change broke a backend contract. What did you learn?",
+    "category": "behavioral",
+    "difficulty": 2,
+    "expected_duration_sec": 150,
+    "keywords": ["contract testing", "communication", "postmortem"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "How do you monitor and observe client-side errors in production?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["observability", "errors", "telemetry"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "Design a feature toggle service that works for both frontend and backend clients.",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["feature flags", "consistency", "rollout"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "When introducing a new API endpoint, how do you provide fallbacks for older clients?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["api versioning", "backwards compatibility", "fallbacks"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "Explain how you would troubleshoot a blank screen error reported by users after deployment.",
+    "category": "technical",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["debugging", "frontend", "monitoring"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "How do you ensure accessibility remains a priority while iterating quickly?",
+    "category": "role_specific",
+    "difficulty": 2,
+    "expected_duration_sec": 120,
+    "keywords": ["accessibility", "testing", "process"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "Share a time you coordinated a cross-functional initiative touching UX, backend, and infrastructure.",
+    "category": "behavioral",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["cross-functional", "collaboration", "initiative"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "Explain the lifecycle of a GraphQL request compared with REST in your stack.",
+    "category": "technical",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["graphql", "rest", "api"]
+  },
+  {
+    "role_slug": "full-stack-developer",
+    "text": "What tooling do you set up to maintain consistency between frontend and backend type definitions?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["types", "tooling", "schema"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "Describe a time you optimized a slow ETL pipeline without pausing daily operations.",
+    "category": "behavioral",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["etl", "optimization", "availability"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "How would you design a data ingestion pipeline that can replay events after a schema change?",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["schema evolution", "ingestion", "replay"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "Walk me through how you would monitor data quality across multiple sources.",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["data quality", "observability", "metrics"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "Explain when you would choose batch processing over streaming for a new pipeline.",
+    "category": "technical",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["batch", "streaming", "architecture"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "Tell me about a partnership with analytics or product teams where data definitions were contentious.",
+    "category": "behavioral",
+    "difficulty": 2,
+    "expected_duration_sec": 150,
+    "keywords": ["stakeholders", "definitions", "communication"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "How do you implement GDPR or data retention requirements in your pipelines?",
+    "category": "role_specific",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["compliance", "privacy", "retention"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "Design a feature store architecture that supports both batch and real-time serving.",
+    "category": "technical",
+    "difficulty": 5,
+    "expected_duration_sec": 240,
+    "keywords": ["feature store", "real-time", "batch"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "What process do you follow to debug mismatched aggregates in a dashboard?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["debugging", "dashboards", "validation"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "Explain the pros and cons of using CDC (change data capture) for database replication.",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["cdc", "replication", "databases"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "How do you budget compute costs for workflows running on a managed platform?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["cost management", "workflow orchestration"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "Share an example where you re-architected storage to handle an order-of-magnitude data growth.",
+    "category": "behavioral",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["scalability", "storage", "growth"]
+  },
+  {
+    "role_slug": "data-engineer",
+    "text": "When would you prefer columnar formats like Parquet over row-based storage?",
+    "category": "technical",
+    "difficulty": 2,
+    "expected_duration_sec": 120,
+    "keywords": ["data formats", "parquet", "optimization"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "Describe a time you identified suspicious activity before tooling raised an alert.",
+    "category": "behavioral",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["threat detection", "intuition", "investigation"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "How would you triage a potential ransomware incident observed on a single endpoint?",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["ransomware", "incident response", "triage"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "Explain your workflow for keeping an incident response playbook current.",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["playbook", "maintenance", "process"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "What telemetry would you collect to detect lateral movement within a network?",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["lateral movement", "telemetry", "network logs"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "Tell me about a time you had to brief executives on an ongoing incident.",
+    "category": "behavioral",
+    "difficulty": 2,
+    "expected_duration_sec": 150,
+    "keywords": ["executive communication", "incident response"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "How do you coordinate with engineering to ensure detection rules stay accurate after feature changes?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["detection", "collaboration", "change management"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "Design a dashboard that helps you monitor high-value assets in real time.",
+    "category": "technical",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["dashboard", "real-time", "monitoring"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "What metrics do you review to evaluate the effectiveness of your SOC processes?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["metrics", "soc", "process improvement"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "Explain how you would investigate unusual outbound traffic from a production server.",
+    "category": "technical",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["network", "analysis", "forensics"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "Share a time you conducted a lessons-learned session after a security incident.",
+    "category": "behavioral",
+    "difficulty": 3,
+    "expected_duration_sec": 180,
+    "keywords": ["post-incident", "lessons learned", "facilitation"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "How do you vet new threat intelligence sources before integrating them into workflows?",
+    "category": "role_specific",
+    "difficulty": 3,
+    "expected_duration_sec": 150,
+    "keywords": ["threat intelligence", "validation", "process"]
+  },
+  {
+    "role_slug": "cyber-analyst",
+    "text": "What steps do you take if you suspect an insider threat?",
+    "category": "technical",
+    "difficulty": 4,
+    "expected_duration_sec": 210,
+    "keywords": ["insider threat", "investigation", "protocols"]
+  }
+]

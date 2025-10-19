@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        args: ["--check", "--diff"]
+        additional_dependencies: ["click==8.1.7"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: backend-pytest
+        name: backend pytest
+        entry: pytest
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: frontend-lint
+        name: frontend lint
+        entry: npm run lint --prefix frontend
+        language: system
+        pass_filenames: false
+      - id: frontend-tests
+        name: frontend unit tests
+        entry: npm run test --prefix frontend
+        language: system
+        pass_filenames: false
+      - id: frontend-format
+        name: frontend format check
+        entry: npm run format:check --prefix frontend
+        language: system
+        pass_filenames: false
