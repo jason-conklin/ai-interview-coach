@@ -7,6 +7,7 @@ import type { Role, RoleLevel } from "../api/types";
 import { RoleCard } from "../components/RoleCard";
 import { useInterviewSession } from "../hooks/useInterviewSession";
 import { ROLE_LEVEL_LABELS } from "../utils/levels";
+import { getQuestionTargetForLevel } from "../utils/questionTargets";
 
 const LEVEL_OPTIONS: Array<{ value: RoleLevel; label: string }> = (
   Object.entries(ROLE_LEVEL_LABELS) as Array<[RoleLevel, string]>
@@ -34,6 +35,8 @@ export const LandingPage = () => {
     mutationFn: ({ role, level }: { role: Role; level: RoleLevel }) =>
       createSession({ role_slug: role.slug, level }),
   });
+
+  const questionTarget = getQuestionTargetForLevel(selectedLevel);
 
   const handleSelectRole = async (role: Role) => {
     const session = await createSessionMutation({ role, level: selectedLevel });
@@ -85,7 +88,7 @@ export const LandingPage = () => {
           </select>
         </label>
         <p className="text-xs text-slate-400 dark:text-slate-500">
-          {LEVEL_HINTS[selectedLevel]}
+          {LEVEL_HINTS[selectedLevel]} Expect {questionTarget} tailored questions in this session.
         </p>
       </div>
 

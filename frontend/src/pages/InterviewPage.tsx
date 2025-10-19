@@ -12,6 +12,8 @@ import { TimerDisplay } from "../components/interview/TimerDisplay";
 import { useInterviewSession } from "../hooks/useInterviewSession";
 import { formatDateTime } from "../utils/formatters";
 import { getRoleLevelLabel } from "../utils/levels";
+import { getQuestionTargetForLevel } from "../utils/questionTargets";
+import { SessionSummaryModal } from "../components/interview/SessionSummaryModal";
 
 const categoryCycle = ["behavioral", "technical", "role_specific"] as const;
 
@@ -29,6 +31,7 @@ export const InterviewPage = () => {
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [latestEvaluation, setLatestEvaluation] = useState<Evaluation | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(sessionId)) {
@@ -63,6 +66,10 @@ export const InterviewPage = () => {
     return categoryCycle[questionVersion % categoryCycle.length];
   }, [questionVersion]);
 
+  const questionTarget = useMemo(() => getQuestionTargetForLevel(activeLevel), [activeLevel]);
+  const answersCompleted = sessionQuery.data?.answers.length ?? 0;
+  const isSessionComplete = answersCompleted >= questionTarget;
+
   const questionQuery = useQuery({
     queryKey: ["question", effectiveRoleSlug, activeCategory, activeLevel, questionVersion],
     queryFn: async () => {
@@ -75,11 +82,11 @@ export const InterviewPage = () => {
       });
       return results[0] ?? null;
     },
-    enabled: Boolean(effectiveRoleSlug),
+    enabled: Boolean(effectiveRoleSlug) && !isSessionComplete,
   });
 
   useEffect(() => {
-    if (questionQuery.data) {
+    if (questionQuery.data && !isSessionComplete) {
       setQuestion(questionQuery.data);
       setAnswerText("");
       setLatestEvaluation(null);
@@ -89,7 +96,7 @@ export const InterviewPage = () => {
       setElapsedSeconds(0);
       setIsTimerRunning(true);
     }
-  }, [questionQuery.data]);
+  }, [questionQuery.data, isSessionComplete]);
 
   useEffect(() => {
     if (!isTimerRunning || !startTime) return;
@@ -106,7 +113,16 @@ export const InterviewPage = () => {
 
   useEffect(() => {
     setQuestionVersion(0);
+    setShowSummaryModal(false);
   }, [sessionId]);
+
+  useEffect(() => {
+    if (isSessionComplete) {
+      setQuestion(null);
+      setIsTimerRunning(false);
+      setShowSummaryModal(true);
+    }
+  }, [isSessionComplete]);
 
   const submitAnswerMutation = useMutation({
     mutationFn: async () => {
@@ -140,6 +156,9 @@ export const InterviewPage = () => {
   });
 
   const isBusy = submitAnswerMutation.isPending || questionQuery.isFetching;
+  const currentQuestionNumber = isSessionComplete
+    ? questionTarget
+    : Math.min(answersCompleted + (question ? 1 : 0), questionTarget);
 
   return (
     <div className="space-y-6">
@@ -150,6 +169,9 @@ export const InterviewPage = () => {
           </h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Level: {getRoleLevelLabel(activeLevel)} - Started {formatDateTime(sessionQuery.data?.started_at)}
+          </p>
+          <p className="mt-2 inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:text-slate-300">
+            Question {currentQuestionNumber} of {questionTarget}
           </p>
         </div>
         <TimerDisplay
@@ -188,7 +210,7 @@ export const InterviewPage = () => {
         setAnswerText={setAnswerText}
         onSubmit={() => submitAnswerMutation.mutate()}
         isSubmitting={submitAnswerMutation.isPending}
-        disabled={!question}
+        disabled={!question || isSessionComplete}
         requiresCode={Boolean(question?.requires_code)}
       />
 
@@ -200,22 +222,42 @@ export const InterviewPage = () => {
 
       <FeedbackPanel evaluation={latestEvaluation} />
 
-      <div className="flex items-center justify-between gap-3">
-        <button
-          type="button"
-          className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-brand hover:text-brand dark:border-slate-700 dark:text-slate-300 dark:hover:border-brand-light dark:hover:text-brand-light"
-          onClick={() => {
-            setQuestionVersion((prev) => prev + 1);
-          }}
-          disabled={isBusy}
-        >
-          Next question
-        </button>
-        <p className="text-xs text-slate-400">
-          Rotate focus automatically: {activeCategory.replace("-", " ")} prompt in progress.
-        </p>
-      </div>
+      {isSessionComplete ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/40 bg-brand/5 px-4 py-3 text-sm text-brand dark:border-brand-light/40 dark:bg-brand-light/10 dark:text-brand-light">
+          <span>Session complete! Review your tailored summary to plan the next practice run.</span>
+          <button
+            type="button"
+            className="rounded-lg border border-brand px-3 py-1 text-xs font-semibold text-brand transition hover:bg-brand/10 dark:border-brand-light dark:text-brand-light dark:hover:bg-brand-light/10"
+            onClick={() => setShowSummaryModal(true)}
+          >
+            View summary
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-brand hover:text-brand dark:border-slate-700 dark:text-slate-300 dark:hover:border-brand-light dark:hover:text-brand-light"
+            onClick={() => {
+              setQuestionVersion((prev) => prev + 1);
+            }}
+            disabled={isBusy || !question}
+          >
+            Next question
+          </button>
+          <p className="text-xs text-slate-400">
+            Rotate focus automatically: {activeCategory.replace("-", " ")} prompt in progress.
+          </p>
+        </div>
+      )}
+
+      <SessionSummaryModal
+        isOpen={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        session={sessionQuery.data ?? null}
+        answersCompleted={answersCompleted}
+        questionTarget={questionTarget}
+      />
     </div>
   );
 };
-
