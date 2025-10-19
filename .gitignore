@@ -5,35 +5,67 @@ yarn.lock
 /frontend/node_modules/
 /frontend/dist/
 /frontend/.vite/
-/frontend/dist/
+/frontend/coverage/
+/frontend/.turbo/
+/frontend/.eslintcache
 
 # Python
 __pycache__/
 *.py[cod]
-*.sqlite3
+*.pyo
+*.pyd
+*.so
+.Python
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
+/.venv/
 /backend/.venv/
 /backend/.ruff_cache/
-/backend/app.db
+/backend/.pytest_cache/
+/backend/.mypy_cache/
+/backend/htmlcov/
+/backend/.coverage
 
-# Env
+# Databases
+/backend/app.db
+/backend/app.sqlite3
+*.sqlite3
+*.db
+
+# Build artifacts
+/dist/
+/build/
+/frontend/dist/
+/backend/build/
+/backend/dist/
+/frontend/logs/
+/backend/logs/
+
+# Environment files
 .env
 .env.*
+.envrc
+/backend/.env
+/frontend/.env
 
-# Editor
+# IDE / OS
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 
-# Coverage / reports
+# Coverage
 coverage.xml
 htmlcov/
 .coverage
+/backend/coverage.xml
 
 # Alembic
 /backend/alembic/versions/__pycache__/
 
 # Docker
 *.log
+*.pid
+.docker/
+.dockerignore
