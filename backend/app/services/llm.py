@@ -217,13 +217,38 @@ class LLMEvaluationService:
 
         focus_hint = question_keywords[0] if question_keywords else question_text.splitlines()[0].strip()
         feedback_lines = [
-            "### Code Review Snapshot",
-            f"- Defines reusable function/class: {'yes' if has_function else 'no'}",
-            f"- Control flow present: {'yes' if has_control_flow else 'no'}",
-            f"- Tests or assertions mentioned: {'yes' if mentions_tests else 'no'}",
-            f"- Sample inputs/outputs referenced: {'yes' if documents_examples else 'no'}",
-            f"- Complexity discussed: {'yes' if mentions_complexity else 'no'}",
-            f"- Focus area from prompt: {focus_hint}",
+            "Code Review Insights -",
+            "- Reusable structure: "
+            + (
+                "Function or class detected, which keeps the solution modular."
+                if has_function
+                else "Wrap the logic in a named function so it can be reused and tested."
+            ),
+            "- Control flow coverage: "
+            + (
+                "Includes loops/branches that demonstrate how the algorithm handles logic."
+                if has_control_flow
+                else "Show the loop or conditional flow that powers the solution."
+            ),
+            "- Testing signals: "
+            + (
+                "Mentions assertions or test ideas-great indicator of reliability."
+                if mentions_tests
+                else "Call out how you would test the behaviour and critical edge cases."
+            ),
+            "- Example walkthrough: "
+            + (
+                "References sample input/output to prove correctness."
+                if documents_examples
+                else "Illustrate the approach with a concrete input/output example."
+            ),
+            "- Complexity awareness: "
+            + (
+                "Time/space trade-offs are clearly acknowledged."
+                if mentions_complexity
+                else "Mention time/space complexity so the interviewer can see you weighed performance."
+            ),
+            f"- Prompt emphasis: {focus_hint}",
         ]
         feedback_markdown = "\n".join(feedback_lines)
 
@@ -315,12 +340,44 @@ class LLMEvaluationService:
             else question_text.splitlines()[0].strip().split(".")[0]
         )
         feedback_lines = [
-            "### Coaching Highlights",
-            f"- Word count: {word_count} (target 180-250 for fuller context)",
-            f"- STAR / structure cues spotted: {star_hits}",
-            f"- Metrics mentioned: {'yes' if has_metrics else 'no'}",
-            f"- Role or domain alignment: {'strong' if references_role else 'light'}",
-            f"- Prompt focus: {focus_hint}",
+            "Coaching Highlights -",
+            "- Response length: "
+            + (
+                f"{word_count} words (great depth)."
+                if word_count >= 180
+                else f"{word_count} words (aim for 180-250 to provide full context)."
+            ),
+            "- Story structure: "
+            + (
+                "Clearly covers the situation, the action you took, and the result."
+                if star_hits >= 3
+                else "Call out the Situation, the Actions you took, and the measurable Results."
+            ),
+            "- Impact signals: "
+            + (
+                "Includes measurable impact or metrics."
+                if has_metrics
+                else "Quantify the outcome (percentages, revenue, time saved) to show impact."
+            ),
+            "- Role alignment: "
+            + (
+                "Ties back to the role's domain and expectations."
+                if references_role
+                else (
+                    "Reference the domain tools or expectations (e.g. "
+                    + ", ".join(keywords[:2])
+                    + ") to show alignment."
+                    if keywords
+                    else "Mention the tools or context that matter for this role."
+                )
+            ),
+            "- Audience takeaway: "
+            + (
+                "Connects the answer to the prompt and stakeholder needs."
+                if mentions_customer
+                else "Call out who benefited (customer, stakeholder, team) to underline impact."
+            ),
+            f"- Prompt emphasis: {focus_hint}",
         ]
         feedback_markdown = "\n".join(feedback_lines)
 
