@@ -35,12 +35,17 @@ export const InterviewPage = () => {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [codeLanguage, setCodeLanguage] = useState(CODE_LANGUAGES[0]);
   const [attemptsByQuestion, setAttemptsByQuestion] = useState<Record<number, number>>({});
+  const [locallyAnsweredQuestionIds, setLocallyAnsweredQuestionIds] = useState<number[]>([]);
 
   useEffect(() => {
     if (!Number.isFinite(sessionId)) {
       navigate("/");
     }
   }, [navigate, sessionId]);
+
+  useEffect(() => {
+    setLocallyAnsweredQuestionIds([]);
+  }, [sessionId]);
 
   const sessionQuery = useQuery({
     queryKey: ["session", sessionId],
@@ -71,12 +76,12 @@ export const InterviewPage = () => {
 
   const questionTarget = useMemo(() => getQuestionTargetForLevel(activeLevel), [activeLevel]);
   const uniqueQuestionIds = useMemo(() => {
-    const ids = new Set<number>();
-    sessionQuery.data?.answers.forEach((answer) => {
+    const ids = new Set<number>(locallyAnsweredQuestionIds);
+    sessionQuery.data?.answers?.forEach((answer) => {
       ids.add(answer.question.id);
     });
     return ids;
-  }, [sessionQuery.data?.answers]);
+  }, [locallyAnsweredQuestionIds, sessionQuery.data?.answers]);
   const answersCompleted = uniqueQuestionIds.size;
   const isSessionComplete = answersCompleted >= questionTarget;
 
@@ -88,9 +93,14 @@ export const InterviewPage = () => {
         role: effectiveRoleSlug,
         category: activeCategory,
         level: activeLevel,
-        limit: 1,
+        limit: 5,
       });
-      return results[0] ?? null;
+      const answeredIds = new Set<number>(locallyAnsweredQuestionIds);
+      sessionQuery.data?.answers?.forEach((answer) => {
+        answeredIds.add(answer.question.id);
+      });
+      const nextQuestion = results.find((candidate) => !answeredIds.has(candidate.id));
+      return nextQuestion ?? null;
     },
     enabled: Boolean(effectiveRoleSlug) && !isSessionComplete,
   });
@@ -182,6 +192,12 @@ useEffect(() => {
           ...prev,
           [answer.question.id]: (prev[answer.question.id] ?? 0) + 1,
         }));
+        setLocallyAnsweredQuestionIds((prev) => {
+          if (prev.includes(answer.question.id)) {
+            return prev;
+          }
+          return [...prev, answer.question.id];
+        });
       }
       setErrorMessage(null);
       sessionQuery.refetch();

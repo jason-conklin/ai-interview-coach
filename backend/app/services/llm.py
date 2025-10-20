@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional
-
 import re
+from typing import Any, Dict, List, Optional
 
 import structlog
 
@@ -75,6 +74,19 @@ class LLMEvaluationService:
             )
 
         try:
+            user_prompt = (
+                f"Role: {role_name}\n"
+                f"Category: {category.value}\n"
+                f"Question: {question_text}\n"
+                f"Answer: {answer_text}\n\n"
+                "Respond ONLY with JSON using the following schema:\n"
+                "{\n"
+                '  "score": float 0-10,\n'
+                '  "feedback_markdown": string,\n'
+                '  "rubric": object,\n'
+                '  "suggested_improvements": [string, ...]\n'
+                "}\n"
+            )
             response = await self._client.responses.create(
                 model="gpt-4.1-mini",
                 input=[
@@ -84,24 +96,7 @@ class LLMEvaluationService:
                     },
                     {
                         "role": "user",
-                        "content": (
-                            "Role: {role}\n"
-                            "Category: {category}\n"
-                            "Question: {question}\n"
-                            "Answer: {answer}\n\n"
-                            "Respond ONLY with JSON using the following schema:\n"
-                            "{{\n"
-                            '  "score": float 0-10,\n'
-                            '  "feedback_markdown": string,\n'
-                            '  "rubric": object,\n'
-                            '  "suggested_improvements": [string, ...]\n'
-                            "}}\n"
-                        ).format(
-                            role=role_name,
-                            category=category.value,
-                            question=question_text,
-                            answer=answer_text,
-                        ),
+                        "content": user_prompt,
                     },
                 ],
                 response_format={"type": "json_object"},
@@ -130,7 +125,6 @@ class LLMEvaluationService:
                 category=category,
                 keywords=question_keywords,
             )
-
 
     def _code_evaluation(
         self, *, answer_text: str, question_text: str, question_keywords: Optional[List[str]] = None
@@ -204,7 +198,6 @@ class LLMEvaluationService:
         if not improvements:
             improvements.append("Consider additional edge cases and annotate the code with expected outcomes.")
 
-        # Ensure suggestions are concise and unique
         seen = set()
         filtered: List[str] = []
         for item in improvements:
@@ -216,42 +209,22 @@ class LLMEvaluationService:
                 break
 
         focus_hint = question_keywords[0] if question_keywords else question_text.splitlines()[0].strip()
-        feedback_lines = [
-            "Code Review Insights -",
-            "- Reusable structure: "
-            + (
-                "Function or class detected, which keeps the solution modular."
-                if has_function
-                else "Wrap the logic in a named function so it can be reused and tested."
-            ),
-            "- Control flow coverage: "
-            + (
-                "Includes loops/branches that demonstrate how the algorithm handles logic."
-                if has_control_flow
-                else "Show the loop or conditional flow that powers the solution."
-            ),
-            "- Testing signals: "
-            + (
-                "Mentions assertions or test ideas-great indicator of reliability."
-                if mentions_tests
-                else "Call out how you would test the behaviour and critical edge cases."
-            ),
-            "- Example walkthrough: "
-            + (
-                "References sample input/output to prove correctness."
-                if documents_examples
-                else "Illustrate the approach with a concrete input/output example."
-            ),
-            "- Complexity awareness: "
-            + (
-                "Time/space trade-offs are clearly acknowledged."
-                if mentions_complexity
-                else "Mention time/space complexity so the interviewer can see you weighed performance."
-            ),
-            f"- Prompt emphasis: {focus_hint}",
-        ]
-        feedback_markdown = "\n".join(feedback_lines)
-
+        strength_lines = ["Code Review Insights -"]
+        if has_function:
+            strength_lines.append("- Reusable structure detected: function or class keeps the solution modular.")
+        if has_control_flow:
+            strength_lines.append("- Control flow present: loops or branches demonstrate how the algorithm executes.")
+        if mentions_tests:
+            strength_lines.append("- Testing signals: mentions assertions or test ideas for reliability.")
+        if documents_examples:
+            strength_lines.append("- Example walkthrough: references sample input/output to prove correctness.")
+        if mentions_complexity:
+            strength_lines.append("- Complexity awareness: time and space trade-offs are acknowledged.")
+        if question_keywords:
+            strength_lines.append(f"- Prompt alignment: references {focus_hint}.")
+        if len(strength_lines) == 1:
+            strength_lines.append("- Baseline code submitted. Build on this with structure, tests, and examples.")
+        feedback_markdown = "\n".join(strength_lines)
         return EvaluationPayload(
             score=score,
             feedback_markdown=feedback_markdown,
@@ -259,7 +232,6 @@ class LLMEvaluationService:
             suggested_improvements=filtered,
             readiness_tier=tier_for_score(score),
         )
-
 
     def _offline_evaluation(
         self,
@@ -339,48 +311,21 @@ class LLMEvaluationService:
             if keywords
             else question_text.splitlines()[0].strip().split(".")[0]
         )
-        feedback_lines = [
-            "Coaching Highlights -",
-            "- Response length: "
-            + (
-                f"{word_count} words (great depth)."
-                if word_count >= 180
-                else f"{word_count} words (aim for 180-250 to provide full context)."
-            ),
-            "- Story structure: "
-            + (
-                "Clearly covers the situation, the action you took, and the result."
-                if star_hits >= 3
-                else "Call out the Situation, the Actions you took, and the measurable Results."
-            ),
-            "- Impact signals: "
-            + (
-                "Includes measurable impact or metrics."
-                if has_metrics
-                else "Quantify the outcome (percentages, revenue, time saved) to show impact."
-            ),
-            "- Role alignment: "
-            + (
-                "Ties back to the role's domain and expectations."
-                if references_role
-                else (
-                    "Reference the domain tools or expectations (e.g. "
-                    + ", ".join(keywords[:2])
-                    + ") to show alignment."
-                    if keywords
-                    else "Mention the tools or context that matter for this role."
-                )
-            ),
-            "- Audience takeaway: "
-            + (
-                "Connects the answer to the prompt and stakeholder needs."
-                if mentions_customer
-                else "Call out who benefited (customer, stakeholder, team) to underline impact."
-            ),
-            f"- Prompt emphasis: {focus_hint}",
-        ]
-        feedback_markdown = "\n".join(feedback_lines)
-
+        strength_lines = ["Coaching Highlights -"]
+        if word_count >= 150:
+            strength_lines.append(f"- Response depth: {word_count} words provide strong context.")
+        if star_hits >= 3:
+            strength_lines.append("- Structured story: clearly covers the situation, actions, and results.")
+        if has_metrics:
+            strength_lines.append("- Impact signals: includes measurable outcomes or metrics.")
+        if references_role:
+            strength_lines.append("- Role alignment: ties the example to the domain and expectations.")
+        if mentions_customer:
+            strength_lines.append("- Audience awareness: identifies who benefited from the work.")
+        if len(strength_lines) == 1:
+            strength_lines.append("- Solid starting point. Build it out with more detail and measurable outcomes.")
+        strength_lines.append(f"- Prompt emphasis: {focus_hint}")
+        feedback_markdown = "\n".join(strength_lines)
         return EvaluationPayload(
             score=total_score,
             feedback_markdown=feedback_markdown,

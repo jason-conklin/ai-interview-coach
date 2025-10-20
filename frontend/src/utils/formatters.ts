@@ -43,7 +43,7 @@ export const readinessBadgeColor = (tier?: string | null) => {
 
 export const formatScore = (score?: number | null, decimals = 1) => {
   if (score === undefined || score === null) {
-    return "—";
+    return "--";
   }
   return score.toFixed(decimals);
 };
