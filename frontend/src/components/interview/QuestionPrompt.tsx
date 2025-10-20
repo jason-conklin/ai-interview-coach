@@ -27,7 +27,9 @@ export const QuestionPrompt = ({ question }: QuestionPromptProps) => (
         </span>
       ) : null}
     </div>
-    <h2 className="mt-4 text-xl font-semibold text-slate-900 dark:text-white">{question.text}</h2>
+    <p className="mt-4 whitespace-pre-line text-xl font-semibold leading-relaxed text-slate-900 dark:text-white">
+      {question.text}
+    </p>
     {question.keywords.length ? (
       <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400">
         {question.keywords.map((keyword) => (

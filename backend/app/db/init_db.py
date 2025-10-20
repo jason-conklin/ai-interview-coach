@@ -5,14 +5,14 @@ import json
 from pathlib import Path
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
 from app.db.base import Base
 from app.models.enums import QuestionCategory, RoleLevel
-from app.models.tables import Question, Role
+from app.models.tables import Answer, Question, Role
 
 logger = structlog.get_logger(__name__)
 
@@ -52,10 +52,34 @@ async def load_seed_data(session: AsyncSession, seed_path: Path) -> None:
             session.add(role)
             await session.flush()
 
-        existing_question = await session.scalar(
-            select(Question).where(Question.role_id == role.id, Question.text == entry["text"])
+        text_variants = [entry["text"], *entry.get("legacy_texts", [])]
+        question_stmt = select(Question).where(
+            Question.role_id == role.id,
+            Question.text.in_(text_variants),
         )
-        if existing_question:
+        questions_result = await session.execute(question_stmt)
+        matching_questions = questions_result.scalars().all()
+
+        if matching_questions:
+            primary = next((question for question in matching_questions if question.text == entry["text"]), matching_questions[0])
+            extras = [question for question in matching_questions if question is not primary]
+
+            for extra in extras:
+                await session.execute(
+                    update(Answer)
+                    .where(Answer.question_id == extra.id)
+                    .values(question_id=primary.id)
+                )
+                await session.delete(extra)
+
+            if primary.text != entry["text"]:
+                primary.text = entry["text"]
+            primary.category = QuestionCategory(entry["category"])
+            primary.level = RoleLevel(entry.get("level", "entry"))
+            primary.difficulty = entry["difficulty"]
+            primary.expected_duration_sec = entry.get("expected_duration_sec")
+            primary.requires_code = bool(entry.get("requires_code", False))
+            primary.keywords = entry.get("keywords", [])
             continue
 
         question = Question(

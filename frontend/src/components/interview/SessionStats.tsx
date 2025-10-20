@@ -44,12 +44,15 @@ export const SessionStats = ({ session }: SessionStatsProps) => {
       </div>
       <div>
         <span className="text-xs uppercase text-slate-400">Overall tier</span>
-        <div
-          className={`mt-1 inline-flex items-center rounded-full border px-3 py-1 text-sm font-semibold ${readinessBadgeColor(
-            session?.summary_tier,
-          )}`}
-        >
-          {session?.summary_tier ?? "Pending"}
+        <div className="mt-1 inline-flex items-center text-sm font-semibold text-slate-900 dark:text-white">
+          <span>Overall tier</span>
+          <span
+            className={`ml-2 inline-flex items-center rounded-full border px-3 py-1 ${readinessBadgeColor(
+              session?.summary_tier,
+            )}`}
+          >
+            {`(${session?.summary_tier ?? "Pending"})`}
+          </span>
         </div>
       </div>
       <div>

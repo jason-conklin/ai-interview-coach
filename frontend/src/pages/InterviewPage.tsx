@@ -16,6 +16,7 @@ import { getQuestionTargetForLevel } from "../utils/questionTargets";
 import { SessionSummaryModal } from "../components/interview/SessionSummaryModal";
 
 const categoryCycle = ["behavioral", "technical", "role_specific"] as const;
+const CODE_LANGUAGES = ["Python", "TypeScript", "JavaScript", "Java", "Go", "C#", "C++", "Ruby", "Swift"];
 
 export const InterviewPage = () => {
   const params = useParams<{ sessionId: string }>();
@@ -32,6 +33,8 @@ export const InterviewPage = () => {
   const [latestEvaluation, setLatestEvaluation] = useState<Evaluation | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [codeLanguage, setCodeLanguage] = useState(CODE_LANGUAGES[0]);
+  const [attemptsByQuestion, setAttemptsByQuestion] = useState<Record<number, number>>({});
 
   useEffect(() => {
     if (!Number.isFinite(sessionId)) {
@@ -67,7 +70,14 @@ export const InterviewPage = () => {
   }, [questionVersion]);
 
   const questionTarget = useMemo(() => getQuestionTargetForLevel(activeLevel), [activeLevel]);
-  const answersCompleted = sessionQuery.data?.answers.length ?? 0;
+  const uniqueQuestionIds = useMemo(() => {
+    const ids = new Set<number>();
+    sessionQuery.data?.answers.forEach((answer) => {
+      ids.add(answer.question.id);
+    });
+    return ids;
+  }, [sessionQuery.data?.answers]);
+  const answersCompleted = uniqueQuestionIds.size;
   const isSessionComplete = answersCompleted >= questionTarget;
 
   const questionQuery = useQuery({
@@ -99,6 +109,23 @@ export const InterviewPage = () => {
   }, [questionQuery.data, isSessionComplete]);
 
   useEffect(() => {
+    if (question) {
+      setAttemptsByQuestion((prev) => {
+        if (prev[question.id] !== undefined) {
+          return prev;
+        }
+        return { ...prev, [question.id]: 0 };
+      });
+    }
+  }, [question]);
+
+  useEffect(() => {
+    if (question?.requires_code && !codeLanguage) {
+      setCodeLanguage(CODE_LANGUAGES[0]);
+    }
+  }, [question?.requires_code, codeLanguage]);
+
+  useEffect(() => {
     if (!isTimerRunning || !startTime) return;
     const interval = window.setInterval(() => {
       const now = Date.now();
@@ -111,12 +138,13 @@ export const InterviewPage = () => {
     setIsTimerRunning(false);
   }, [sessionId]);
 
-  useEffect(() => {
-    setQuestionVersion(0);
-    setShowSummaryModal(false);
-  }, [sessionId]);
+useEffect(() => {
+  setQuestionVersion(0);
+  setShowSummaryModal(false);
+  setAttemptsByQuestion({});
+}, [sessionId]);
 
-  useEffect(() => {
+useEffect(() => {
     if (isSessionComplete) {
       setQuestion(null);
       setIsTimerRunning(false);
@@ -133,9 +161,13 @@ export const InterviewPage = () => {
         throw new Error("Timer has not started yet. Try resetting the timer.");
       }
       const endTime = new Date();
+      const composedAnswerText =
+        question.requires_code && codeLanguage
+          ? `Language: ${codeLanguage}\n\n${answerText}`
+          : answerText;
       const answer = await submitAnswer(sessionId, {
         question_id: question.id,
-        answer_text: answerText,
+        answer_text: composedAnswerText,
         started_at: startTime.toISOString(),
         ended_at: endTime.toISOString(),
       });
@@ -144,7 +176,13 @@ export const InterviewPage = () => {
       setIsTimerRunning(false);
       return answer;
     },
-    onSuccess: () => {
+    onSuccess: (answer) => {
+      if (answer.question?.id) {
+        setAttemptsByQuestion((prev) => ({
+          ...prev,
+          [answer.question.id]: (prev[answer.question.id] ?? 0) + 1,
+        }));
+      }
       setErrorMessage(null);
       sessionQuery.refetch();
     },
@@ -156,9 +194,18 @@ export const InterviewPage = () => {
   });
 
   const isBusy = submitAnswerMutation.isPending || questionQuery.isFetching;
-  const currentQuestionNumber = isSessionComplete
-    ? questionTarget
-    : Math.min(answersCompleted + (question ? 1 : 0), questionTarget);
+  const currentQuestionNumber = useMemo(() => {
+    if (isSessionComplete) {
+      return questionTarget;
+    }
+    const currentId = question?.id;
+    if (currentId && !uniqueQuestionIds.has(currentId)) {
+      return Math.min(answersCompleted + 1, questionTarget);
+    }
+    return Math.min(answersCompleted, questionTarget);
+  }, [answersCompleted, isSessionComplete, questionTarget, question?.id, uniqueQuestionIds]);
+  const currentAttemptCount = question ? attemptsByQuestion[question.id] ?? 0 : 0;
+  const submitButtonLabel = currentAttemptCount > 0 ? "Try Again" : "Submit Answer";
 
   return (
     <div className="space-y-6">
@@ -212,6 +259,10 @@ export const InterviewPage = () => {
         isSubmitting={submitAnswerMutation.isPending}
         disabled={!question || isSessionComplete}
         requiresCode={Boolean(question?.requires_code)}
+        codeLanguage={codeLanguage}
+        onChangeLanguage={setCodeLanguage}
+        languageOptions={CODE_LANGUAGES}
+        submitLabel={submitButtonLabel}
       />
 
       {errorMessage ? (

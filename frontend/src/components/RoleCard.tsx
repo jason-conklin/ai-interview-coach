@@ -13,7 +13,7 @@ export const RoleCard = ({ role, onSelect }: RoleCardProps) => (
   >
     <span className="text-sm uppercase tracking-wide text-brand">{role.name}</span>
     <h3 className="mt-3 text-lg font-semibold text-slate-900 dark:text-slate-100">
-      {role.slug.replace(/-/g, " ")}
+      {role.name}
     </h3>
     <p className="mt-2 flex-1 text-sm text-slate-600 dark:text-slate-300">
       {role.description ?? "Practice tailored behavioral and technical questions for this role."}

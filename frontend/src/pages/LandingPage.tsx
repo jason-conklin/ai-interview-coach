@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { createSession, fetchRoles } from "../api/interview";
@@ -21,6 +21,8 @@ const LEVEL_HINTS: Record<RoleLevel, string> = {
   staff: "High-stakes strategy, cross-team impact, and production-hardening exercises.",
 };
 
+const toTitleCase = (value: string) => value.replace(/\b\w/g, (char) => char.toUpperCase());
+
 export const LandingPage = () => {
   const navigate = useNavigate();
   const { startSession } = useInterviewSession();
@@ -37,6 +39,24 @@ export const LandingPage = () => {
   });
 
   const questionTarget = getQuestionTargetForLevel(selectedLevel);
+
+  const sortedRoles = useMemo(() => {
+    if (!roles) return [];
+    return roles
+      .slice()
+      .sort((a, b) => {
+        const priorityA = a.slug === "software-developer" ? -1 : 0;
+        const priorityB = b.slug === "software-developer" ? -1 : 0;
+        if (priorityA !== priorityB) {
+          return priorityA - priorityB;
+        }
+        return a.name.localeCompare(b.name);
+      })
+      .map((role) => ({
+        ...role,
+        name: toTitleCase(role.name),
+      }));
+  }, [roles]);
 
   const handleSelectRole = async (role: Role) => {
     const session = await createSessionMutation({ role, level: selectedLevel });
@@ -101,12 +121,8 @@ export const LandingPage = () => {
           </p>
         ) : (
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
-            {roles?.map((role) => (
-              <RoleCard
-                key={role.id}
-                role={role}
-                onSelect={(selectedRole) => void handleSelectRole(selectedRole)}
-              />
+            {sortedRoles.map((role) => (
+              <RoleCard key={role.id} role={role} onSelect={(selectedRole) => void handleSelectRole(selectedRole)} />
             ))}
           </div>
         )}
@@ -128,7 +144,7 @@ export const LandingPage = () => {
         <button
           disabled={isPending}
           onClick={() => {
-            const firstRole = roles?.[0];
+            const firstRole = sortedRoles?.[0];
             if (firstRole) {
               void handleSelectRole(firstRole);
             }
