@@ -193,10 +193,20 @@ export const SessionSummaryModal = ({
         const sortedByScore = [...rubricEntries].sort((a, b) => a[1] - b[1]);
         const [lowestKey, lowestScore] = sortedByScore[0];
         const numericLowest = Number(lowestScore);
-        const improvement =
+        const baseImprovement =
           numericLowest >= 8.5
             ? "Scores are consistently strong across the rubric - consider practicing brand new scenarios for variety."
             : describeImprovement(lowestKey, numericLowest);
+        const actionableTip = evaluation.suggested_improvements?.find(
+          (tip) => tip && tip.trim().length > 0,
+        );
+        const improvement =
+          actionableTip && !baseImprovement.includes(actionableTip)
+            ? `${baseImprovement} Next step: ${actionableTip}`
+            : baseImprovement;
+        const extraSuggestions = (evaluation.suggested_improvements ?? [])
+          .filter((tip) => tip && tip.trim().length > 0 && tip !== actionableTip)
+          .slice(0, 2);
         const strengthEntry = sortedByScore
           .slice()
           .reverse()
@@ -209,6 +219,7 @@ export const SessionSummaryModal = ({
           questionId,
           question: group.questionText,
           improvement,
+          extraSuggestions,
           strength,
           attempts: group.attempts.length,
           lastScore: evaluation.score,
@@ -216,8 +227,16 @@ export const SessionSummaryModal = ({
         };
       })
       .filter((item): item is NonNullable<typeof item> => Boolean(item))
-      .slice(0, 4);
+      ;
   }, [groupedAnswers]);
+
+  const waysToImproveLookup = useMemo(() => {
+    const map = new Map<number, (typeof waysToImprove)[number]>();
+    waysToImprove.forEach((entry) => {
+      map.set(entry.questionId ?? entry.questionIndex, entry);
+    });
+    return map;
+  }, [waysToImprove]);
 
   const { data: historySessions } = useQuery({
     queryKey: ["history-trend", session?.role.slug],
@@ -347,6 +366,37 @@ export const SessionSummaryModal = ({
                   );
                   const questionId = attempts[0]?.question.id ?? index;
                   const isExpanded = expandedQuestions[questionId] ?? false;
+                  const improvementEntry = waysToImproveLookup.get(questionId);
+                  const strengthMessage = improvementEntry?.strength;
+                  const highlightLines =
+                    latestAttempt.evaluation?.feedback_markdown
+                      ?.split("\n")
+                      .map((line) => line.trim())
+                      .filter((line) => line.length > 0)
+                      .map((line) => (line.startsWith("- ") ? line.slice(2).trim() : line))
+                      .filter((line) => {
+                        const normalized = line.toLowerCase();
+                        if (normalized.startsWith("coaching highlights")) {
+                          return false;
+                        }
+                        if (normalized.startsWith("code review insights")) {
+                          return false;
+                        }
+                        const positiveKeywords = [
+                          "includes",
+                          "detected",
+                          "clearly",
+                          "ties back",
+                          "connects",
+                          "keeps",
+                          "modular",
+                          "acknowledged",
+                          "great",
+                          "strong",
+                        ];
+                        return positiveKeywords.some((keyword) => normalized.includes(keyword));
+                      })
+                      .slice(0, 2) ?? [];
                   return (
                     <div
                       key={`${group.questionText}-${index}`}
@@ -367,10 +417,17 @@ export const SessionSummaryModal = ({
                           1,
                         )}
                       </p>
-                      {latestAttempt.evaluation?.feedback_markdown ? (
-                        <p className="mt-2 whitespace-pre-line text-xs text-slate-500 dark:text-slate-400">
-                          {latestAttempt.evaluation.feedback_markdown.replace(/\*\*/g, "")}
+                      {strengthMessage ? (
+                        <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400">
+                          Strength highlight: {strengthMessage}
                         </p>
+                      ) : null}
+                      {highlightLines.length ? (
+                        <ul className="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                          {highlightLines.map((line, highlightIndex) => (
+                            <li key={`${questionId}-highlight-${highlightIndex}`}>{line}</li>
+                          ))}
+                        </ul>
                       ) : null}
                       <button
                         type="button"
@@ -422,6 +479,15 @@ export const SessionSummaryModal = ({
                         <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
                           Strength: {item.strength}
                         </p>
+                      ) : null}
+                      {item.extraSuggestions.length ? (
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-500 dark:text-slate-400">
+                          {item.extraSuggestions.map((tip, suggestionIndex) => (
+                            <li key={`${item.questionId ?? item.questionIndex}-suggestion-${suggestionIndex}`}>
+                              {tip}
+                            </li>
+                          ))}
+                        </ul>
                       ) : null}
                     </li>
                   ))}
