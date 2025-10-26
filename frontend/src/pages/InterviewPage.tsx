@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { evaluateAnswer, fetchQuestions, fetchSessionDetail, submitAnswer } from "../api/interview";
+import { evaluateAnswer, fetchDiagnostics, fetchQuestions, fetchSessionDetail, submitAnswer } from "../api/interview";
 import type { Evaluation, Question, RoleLevel } from "../api/types";
 import { AnswerComposer } from "../components/interview/AnswerComposer";
 import { FeedbackPanel } from "../components/interview/FeedbackPanel";
@@ -14,9 +14,11 @@ import { formatDateTime } from "../utils/formatters";
 import { getRoleLevelLabel } from "../utils/levels";
 import { getQuestionTargetForLevel } from "../utils/questionTargets";
 import { SessionSummaryModal } from "../components/interview/SessionSummaryModal";
+import { EvaluationStatusBanner } from "../components/interview/EvaluationStatusBanner";
 
 const categoryCycle = ["behavioral", "technical", "role_specific"] as const;
 const CODE_LANGUAGES = ["Python", "TypeScript", "JavaScript", "Java", "Go", "C#", "C++", "Ruby", "Swift"];
+type DiagnosticStatus = "llm" | "heuristic" | "unknown";
 
 export const InterviewPage = () => {
   const params = useParams<{ sessionId: string }>();
@@ -36,6 +38,9 @@ export const InterviewPage = () => {
   const [codeLanguage, setCodeLanguage] = useState(CODE_LANGUAGES[0]);
   const [attemptsByQuestion, setAttemptsByQuestion] = useState<Record<number, number>>({});
   const [locallyAnsweredQuestionIds, setLocallyAnsweredQuestionIds] = useState<number[]>([]);
+  const [llmNotice, setLlmNotice] = useState<string | null>(null);
+  const [diagnosticStatus, setDiagnosticStatus] = useState<DiagnosticStatus>("unknown");
+  const [bannerDismissed, setBannerDismissed] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(sessionId)) {
@@ -84,6 +89,38 @@ export const InterviewPage = () => {
   }, [locallyAnsweredQuestionIds, sessionQuery.data?.answers]);
   const answersCompleted = uniqueQuestionIds.size;
   const isSessionComplete = answersCompleted >= questionTarget;
+
+  const refreshDiagnostics = useCallback(async () => {
+    try {
+      const data = await fetchDiagnostics();
+      const pathValue =
+        typeof data.status?.path === "string" ? (data.status.path as string).toLowerCase() : "unknown";
+      const reasonValue =
+        typeof data.status?.reason === "string" ? (data.status.reason as string).toLowerCase() : "";
+      const heuristicKeywords = ["llm_exception", "client_unavailable", "offline"];
+      const isHeuristic =
+        pathValue === "heuristic" || heuristicKeywords.some((token) => reasonValue.includes(token));
+      const nextStatus: DiagnosticStatus = isHeuristic ? "heuristic" : pathValue === "llm" ? "llm" : "unknown";
+      setDiagnosticStatus((prev) => {
+        if (nextStatus === "heuristic" && prev !== "heuristic") {
+          setBannerDismissed(false);
+        }
+        return nextStatus;
+      });
+    } catch (error) {
+      console.error("Unable to fetch diagnostics", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshDiagnostics();
+    const interval = window.setInterval(() => {
+      void refreshDiagnostics();
+    }, 30_000);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [refreshDiagnostics]);
 
   const questionQuery = useQuery({
     queryKey: ["question", effectiveRoleSlug, activeCategory, activeLevel, questionVersion],
@@ -181,8 +218,14 @@ useEffect(() => {
         started_at: startTime.toISOString(),
         ended_at: endTime.toISOString(),
       });
-      const evaluation = await evaluateAnswer(answer.id);
-      setLatestEvaluation(evaluation);
+      const evaluationResponse = await evaluateAnswer(answer.id);
+      setLatestEvaluation(evaluationResponse.evaluation);
+      if (evaluationResponse.meta?.reason === "llm_quota") {
+        setLlmNotice("LLM temporarily unavailable (quota) — using offline scoring.");
+      } else if (!evaluationResponse.meta?.reason) {
+        setLlmNotice(null);
+      }
+      void refreshDiagnostics();
       setIsTimerRunning(false);
       return answer;
     },
@@ -206,6 +249,7 @@ useEffect(() => {
       const message =
         error instanceof Error ? error.message : "Unable to evaluate the answer. Try again.";
       setErrorMessage(message);
+      void refreshDiagnostics();
     },
   });
 
@@ -225,6 +269,11 @@ useEffect(() => {
 
   return (
     <div className="space-y-6">
+      <EvaluationStatusBanner
+        status={diagnosticStatus}
+        visible={!bannerDismissed && diagnosticStatus === "heuristic"}
+        onDismiss={() => setBannerDismissed(true)}
+      />
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">
@@ -247,6 +296,22 @@ useEffect(() => {
           }}
         />
       </div>
+
+      {llmNotice ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex items-start gap-3 rounded-2xl border border-amber-400/60 bg-amber-50/90 px-4 py-3 text-sm text-amber-800 shadow-sm dark:border-amber-200/30 dark:bg-amber-400/10 dark:text-amber-100"
+        >
+          <span className="mt-0.5 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-amber-500/20 text-base font-semibold text-amber-700 dark:bg-amber-300/20 dark:text-amber-100">
+            !
+          </span>
+          <div className="space-y-1">
+            <p className="font-semibold">Using offline scoring temporarily</p>
+            <p className="leading-snug">{llmNotice}</p>
+          </div>
+        </div>
+      ) : null}
 
       {sessionQuery.isError ? (
         <div className="rounded-xl border border-danger/40 bg-danger/10 px-4 py-3 text-sm text-danger">
@@ -328,3 +393,4 @@ useEffect(() => {
     </div>
   );
 };
+

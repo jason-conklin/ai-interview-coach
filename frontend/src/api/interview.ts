@@ -1,7 +1,8 @@
 import { apiClient } from "./client";
 import type {
   Answer,
-  Evaluation,
+  DiagnosticsResponse,
+  EvaluationResponse,
   HistoryItem,
   Question,
   Role,
@@ -44,8 +45,15 @@ export const submitAnswer = async (
   return response.data;
 };
 
-export const evaluateAnswer = async (answerId: number): Promise<Evaluation> => {
-  const response = await apiClient.post<Evaluation>("/evaluate", { answer_id: answerId });
+export const evaluateAnswer = async (
+  answerId: number,
+  options?: { debugForceLLM?: boolean },
+): Promise<EvaluationResponse> => {
+  const payload: Record<string, unknown> = { answer_id: answerId };
+  if (options?.debugForceLLM !== undefined) {
+    payload.debug_force_llm = options.debugForceLLM;
+  }
+  const response = await apiClient.post<EvaluationResponse>("/evaluate", payload);
   return response.data;
 };
 
@@ -60,5 +68,10 @@ export const fetchHistory = async (params?: {
   limit?: number;
 }): Promise<HistoryItem[]> => {
   const response = await apiClient.get<HistoryItem[]>("/history", { params });
+  return response.data;
+};
+
+export const fetchDiagnostics = async (): Promise<DiagnosticsResponse> => {
+  const response = await apiClient.get<DiagnosticsResponse>("/diagnostics");
   return response.data;
 };

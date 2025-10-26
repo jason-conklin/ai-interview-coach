@@ -32,6 +32,40 @@ export interface Evaluation {
   readiness_tier: SessionTier;
 }
 
+export interface EvaluationMeta {
+  fallback?: string;
+  reason?: string;
+  message?: string;
+  mode?: string;
+  debug?: Record<string, unknown>;
+}
+
+export interface EvaluationResponse {
+  evaluation: Evaluation;
+  meta?: EvaluationMeta | null;
+}
+
+export interface DiagnosticsStatus {
+  path?: string | null;
+  reason?: string | null;
+  mode?: string | null;
+  model?: string | null;
+  provider?: string | null;
+  base_url?: string | null;
+}
+
+export interface DiagnosticsResponse {
+  env: Record<string, unknown>;
+  config: Record<string, unknown>;
+  reason: string;
+  models: {
+    provider?: string | null;
+    base_url?: string | null;
+    eval_model?: string | null;
+  };
+  status: DiagnosticsStatus;
+}
+
 export interface Answer {
   id: number;
   question: Question;
