@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
-import os
+import random
 import re
-from typing import Any, Dict, List, Optional
+import time
+from inspect import Parameter, signature
+from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
 
@@ -15,28 +18,303 @@ except ImportError:  # pragma: no cover - optional dependency
 
 from app.core.config import settings
 from app.models.enums import QuestionCategory
-from app.services.evaluation import (
-    EvaluationPayload,
-    SYSTEM_PROMPT,
-    default_rubric,
-    tier_for_score,
-)
+from app.services.evaluation import EvaluationPayload, SYSTEM_PROMPT, default_rubric, tier_for_score
+from app.services.evaluator_status import set_status
+
+CODE_BLOCK_PLACEHOLDER = "[REDACTED_CODE_BLOCK]"
+_CODE_FENCE_PATTERN = re.compile(r"```.*?```", re.DOTALL)
+_TILDE_FENCE_PATTERN = re.compile(r"~~~.*?~~~", re.DOTALL)
+
+EVAL_MODEL_NAME = settings.eval_model
+EVALUATION_JSON_SCHEMA = """
+{
+  "score": number between 0 and 10,
+  "feedback_markdown": string,
+  "rubric": object,
+  "suggested_improvements": array of strings
+}
+""".strip()
+
+
+def _redact_code_snippets(text: str) -> str:
+    if not text:
+        return text
+    redacted = _CODE_FENCE_PATTERN.sub(CODE_BLOCK_PLACEHOLDER, text)
+    redacted = _TILDE_FENCE_PATTERN.sub(CODE_BLOCK_PLACEHOLDER, redacted)
+    processed_lines = []
+    for line in redacted.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            processed_lines.append(line)
+            continue
+        non_alnum_ratio = 0.0
+        if stripped:
+            non_alnum_ratio = sum(1 for ch in stripped if not ch.isalnum() and ch not in {" ", "_", "-", "."}) / len(stripped)
+        if (
+            len(stripped) > 120
+            or stripped.startswith(("def ", "class ", "function ", "#include", "public ", "private "))
+            or ("{" in stripped and "}" in stripped)
+            or non_alnum_ratio > 0.4
+        ):
+            processed_lines.append(CODE_BLOCK_PLACEHOLDER)
+        else:
+            processed_lines.append(line)
+    return "\n".join(processed_lines)
+
+
+def _code_detection_score(question_text: str, answer_text: str, requires_code: bool) -> float:
+    score = 1.0 if requires_code else 0.0
+    for snippet in (question_text, answer_text):
+        lower = snippet.lower()
+        if "```" in lower:
+            score += 0.5
+        if "~~~" in lower:
+            score += 0.3
+        if any(token in lower for token in ("def ", "class ", "function ", "lambda ", "#include", "public ", "private ")):
+            score += 0.4
+        if any(token in lower for token in (";", "{", "}")):
+            score += 0.2
+        lines = [ln for ln in lower.splitlines() if ln.strip()]
+        if lines:
+            code_lines = sum(
+                1
+                for ln in lines
+                if ln.strip().startswith(("def ", "class ", "for ", "while ", "if ", "public ", "private "))
+                or ln.strip().endswith(";")
+            )
+            score += min(0.3, code_lines / len(lines))
+    return min(score / 1.5, 1.0)
+
+
+def _extract_response_text(response: Any) -> str:
+    if not response:
+        return ""
+    text = getattr(response, "output_text", None)
+    if text:
+        return text
+    output = getattr(response, "output", None)
+    if output:
+        chunks: List[str] = []
+        for block in output:
+            contents = getattr(block, "content", None)
+            if contents:
+                for part in contents:
+                    value = getattr(part, "text", None)
+                    if value:
+                        chunks.append(value)
+        if chunks:
+            return "\n".join(chunks)
+    return ""
+
+
+def _clean_json_payload(raw: str) -> str:
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[\w]*\n?", "", cleaned)
+        cleaned = re.sub(r"\n```$", "", cleaned)
+    cleaned = cleaned.strip()
+    cleaned = re.sub(r",\s*}", "}", cleaned)
+    cleaned = re.sub(r",\s*]", "]", cleaned)
+    return cleaned
+
+
+def _truncate_text(text: str, limit: int) -> str:
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3] + "..."
+
 
 logger = structlog.get_logger(__name__)
 
 
+class LLMQuotaError(RuntimeError):
+    pass
+
+
 class LLMEvaluationService:
+    _cooldown_until: Optional[float] = None
+
     def __init__(self, api_key: Optional[str] = None) -> None:
-        api_key = api_key or settings.openai_api_key
-        self._api_key = api_key
+        self._provider = settings.llm_provider
+        self._base_url = settings.llm_base_url
+        base_url = self._base_url
+
+        if self._provider == "custom":
+            effective_key = api_key or settings.llm_api_key or settings.openai_api_key or "lm-studio"
+        else:
+            effective_key = api_key or settings.openai_api_key
+
+        self._api_key = effective_key
         self._should_stub = _should_use_stub()
 
-        if self._should_stub:
+        client_kwargs: Dict[str, Any] = {}
+        if effective_key:
+            client_kwargs["api_key"] = effective_key
+        if base_url:
+            client_kwargs["base_url"] = base_url
+
+        if self._should_stub or AsyncOpenAI is None or (self._provider == "custom" and not base_url):
             self._client = None
-        elif AsyncOpenAI is not None:
-            self._client = AsyncOpenAI(api_key=api_key) if api_key else None
         else:
-            self._client = None
+            try:
+                self._client = AsyncOpenAI(**client_kwargs) if client_kwargs.get("api_key") else None
+            except TypeError:
+                # Older openai clients may not accept base_url; retry without it.
+                fallback_kwargs = dict(client_kwargs)
+                fallback_kwargs.pop("base_url", None)
+                self._client = AsyncOpenAI(**fallback_kwargs) if fallback_kwargs.get("api_key") else None
+
+        logger.info(
+            "llm_client_initialized",
+            provider=self._provider,
+            base_url=base_url or "default",
+            has_client=self._client is not None,
+            use_stub=self._should_stub,
+        )
+
+        self._supports_responses = self._supports_responses_json()
+
+    def _status_context(self) -> Dict[str, Optional[str]]:
+        return {"provider": self._provider, "base_url": self._base_url}
+
+    def _log_context(self) -> Dict[str, Any]:
+        return {"provider": self._provider, "base_url": self._base_url or "default"}
+    @classmethod
+    def _cooldown_active(cls) -> bool:
+        if cls._cooldown_until is None:
+            return False
+        return time.time() < cls._cooldown_until
+
+    @classmethod
+    def _trigger_cooldown(cls) -> None:
+        cls._cooldown_until = time.time() + max(0, settings.eval_cooldown_seconds)
+
+    def _supports_responses_json(self) -> bool:
+        if not self._client or not hasattr(self._client, "responses"):
+            return False
+        create = getattr(self._client.responses, "create", None)
+        if create is None:
+            return False
+        try:
+            sig = signature(create)
+            params = sig.parameters
+            for name, param in params.items():
+                if name == "response_format":
+                    return True
+                if param.kind == Parameter.VAR_KEYWORD:
+                    return True
+        except (TypeError, ValueError):
+            return True
+        return False
+
+    async def _llm_json_single(self, user_prompt: str) -> Tuple[str, str]:
+        if not self._client:
+            raise RuntimeError("LLM client is not configured.")
+
+        # Preferred path: Responses API with JSON mode
+        if self._supports_responses and hasattr(self._client, "responses"):
+            try:
+                response = await self._client.responses.create(
+                    model=EVAL_MODEL_NAME,
+                    input=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_prompt},
+                ],
+                temperature=settings.eval_temperature,
+                top_p=settings.eval_top_p,
+                presence_penalty=settings.eval_presence_penalty,
+                frequency_penalty=settings.eval_frequency_penalty,
+                max_output_tokens=settings.eval_max_output_tokens,
+                response_format={"type": "json_object"},
+            )
+                logger.info("llm_path", path="responses_json", **self._log_context())
+                return _extract_response_text(response), "llm_json_mode"
+            except TypeError as exc:
+                logger.warning("llm_path", path="responses_json", error=str(exc), **self._log_context())
+                self._supports_responses = False
+            except Exception as exc:
+                logger.warning("llm_path", path="responses_json", error=str(exc), **self._log_context())
+
+        chat_api = getattr(getattr(self._client, "chat", None), "completions", None)
+        if chat_api:
+            # Attempt chat completions with JSON mode (if supported)
+            try:
+                response = await chat_api.create(
+                    model=EVAL_MODEL_NAME,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": f"{user_prompt}\nReturn ONLY valid JSON matching this schema:\n{EVALUATION_JSON_SCHEMA}",
+                        },
+                    ],
+                    temperature=settings.eval_temperature,
+                    top_p=settings.eval_top_p,
+                    presence_penalty=settings.eval_presence_penalty,
+                    frequency_penalty=settings.eval_frequency_penalty,
+                    max_tokens=settings.eval_max_output_tokens,
+                    response_format={"type": "json_object"},
+                )
+                message = response.choices[0].message.content if response.choices else ""
+                logger.info("llm_path", path="chat_json", **self._log_context())
+                return message or "", "llm_chat_fallback"
+            except TypeError as exc:
+                logger.warning("llm_path", path="chat_json", error=str(exc), **self._log_context())
+            except Exception as exc:
+                logger.warning("llm_path", path="chat_json", error=str(exc), **self._log_context())
+
+            # Final fallback: chat completions with strict instruction only
+            response = await chat_api.create(
+                model=EVAL_MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": (
+                            f"{user_prompt}\nReturn ONLY valid JSON matching this schema:\n{EVALUATION_JSON_SCHEMA}\n"
+                            "Do not include any markdown fences or explanation text."
+                        ),
+                    },
+                ],
+                temperature=settings.eval_temperature,
+                top_p=settings.eval_top_p,
+                presence_penalty=settings.eval_presence_penalty,
+                frequency_penalty=settings.eval_frequency_penalty,
+                max_tokens=settings.eval_max_output_tokens,
+            )
+            message = response.choices[0].message.content if response.choices else ""
+            logger.info("llm_path", path="chat_instruction_only", **self._log_context())
+            return message or "", "llm_chat_fallback"
+
+        raise RuntimeError("No supported OpenAI API method available for JSON responses.")
+
+    @staticmethod
+    def _is_quota_error(exc: Exception) -> bool:
+        message = str(exc).lower()
+        if "insufficient_quota" in message or "quota" in message:
+            return True
+        status = getattr(exc, "status_code", None)
+        if status == 429:
+            return True
+        code = getattr(exc, "code", "")
+        if isinstance(code, str) and "quota" in code.lower():
+            return True
+        return False
+
+    async def _llm_json_request(self, user_prompt: str) -> Tuple[str, str]:
+        delays = [0.25, 0.5, 1.0]
+        for attempt, delay in enumerate(delays):
+            try:
+                return await self._llm_json_single(user_prompt)
+            except OpenAIError as exc:
+                if self._is_quota_error(exc):
+                    if attempt == len(delays) - 1:
+                        raise LLMQuotaError(str(exc)) from exc
+                    jitter = random.uniform(0, delay / 2)
+                    await asyncio.sleep(delay + jitter)
+                    continue
+                raise
+        raise LLMQuotaError("Quota exhausted after retries.")
 
     async def evaluate_answer(
         self,
@@ -47,62 +325,95 @@ class LLMEvaluationService:
         role_name: str,
         requires_code: bool = False,
         question_keywords: Optional[List[str]] = None,
-    ) -> EvaluationPayload:
-        if requires_code:
-            return self._code_evaluation(
-                answer_text=answer_text,
-                question_text=question_text,
-                question_keywords=question_keywords,
-            )
+        debug_force_llm: bool = False,
+    ) -> Tuple[EvaluationPayload, Optional[Dict[str, Any]]]:
+        debug_override = settings.debug_force_llm or debug_force_llm
+        code_score = _code_detection_score(question_text, answer_text, requires_code)
+        code_like = code_score >= settings.code_detection_threshold or requires_code
+        meta: Optional[Dict[str, Any]] = None
 
-        if self._should_stub or not self._client:
-            logger.warning("OPENAI_API_KEY not configured; returning offline evaluation.")
-            return self._offline_evaluation(
+        if not settings.use_llm and not debug_override:
+            logger.info("evaluation_path", path="heuristic", reason="use_llm_disabled", **self._log_context())
+            set_status(path="heuristic", reason="use_llm_disabled", model="offline-heuristic", **self._status_context())
+            payload = self._offline_evaluation(
                 answer_text=answer_text,
                 question_text=question_text,
                 category=category,
+                requires_code=requires_code,
                 keywords=question_keywords,
             )
+            return payload, meta
 
-        if AsyncOpenAI is None:
-            logger.warning("openai package not installed; using offline evaluation.")
-            return self._offline_evaluation(
+        if not debug_override and self._cooldown_active():
+            logger.info("evaluation_path", path="heuristic", reason="llm_quota_cooldown", **self._log_context())
+            set_status(path="heuristic", reason="llm_quota", model="offline-heuristic", **self._status_context())
+            payload = self._offline_evaluation(
                 answer_text=answer_text,
                 question_text=question_text,
                 category=category,
+                requires_code=requires_code,
                 keywords=question_keywords,
             )
+            meta = {
+                "fallback": "heuristic",
+                "reason": "llm_quota",
+                "message": "OpenAI quota exceeded; used offline evaluation.",
+            }
+            return payload, meta
+
+        if not debug_override and not settings.allow_llm_for_code and code_like:
+            logger.info(
+                "evaluation_path",
+                path="heuristic",
+                reason="code_question_forced",
+                code_score=code_score,
+                **self._log_context(),
+            )
+            set_status(path="heuristic", reason="code_question_forced", model="offline-heuristic", **self._status_context())
+            payload = self._offline_evaluation(
+                answer_text=answer_text,
+                question_text=question_text,
+                category=category,
+                requires_code=requires_code,
+                keywords=question_keywords,
+            )
+            return payload, meta
+
+        if (self._should_stub and not debug_override) or not self._client or AsyncOpenAI is None:
+            logger.warning("evaluation_path", path="heuristic", reason="client_unavailable", **self._log_context())
+            set_status(path="heuristic", reason="client_unavailable", model="offline-heuristic", **self._status_context())
+            payload = self._offline_evaluation(
+                answer_text=answer_text,
+                question_text=question_text,
+                category=category,
+                requires_code=requires_code,
+                keywords=question_keywords,
+            )
+            return payload, meta
+
+        status_reason = "debug_force_llm" if debug_override else ("llm_code_allowed" if code_like else "success")
+
+        question_for_model = _truncate_text(question_text, settings.eval_max_input_chars)
+        answer_for_model = _truncate_text(answer_text, settings.eval_max_input_chars)
+        if code_like or debug_override or settings.allow_llm_for_code:
+            question_for_model = _truncate_text(_redact_code_snippets(question_text), settings.eval_max_input_chars)
+            answer_for_model = _truncate_text(_redact_code_snippets(answer_text), settings.eval_max_input_chars)
 
         try:
             user_prompt = (
                 f"Role: {role_name}\n"
                 f"Category: {category.value}\n"
-                f"Question: {question_text}\n"
-                f"Answer: {answer_text}\n\n"
+                f"Question: {question_for_model}\n"
+                f"Answer: {answer_for_model}\n\n"
                 "Respond ONLY with JSON using the following schema:\n"
-                "{\n"
-                '  "score": float 0-10,\n'
-                '  "feedback_markdown": string,\n'
-                '  "rubric": object,\n'
-                '  "suggested_improvements": [string, ...]\n'
-                "}\n"
+                f"{EVALUATION_JSON_SCHEMA}\n"
             )
-            response = await self._client.responses.create(
-                model="gpt-4.1-mini",
-                input=[
-                    {
-                        "role": "system",
-                        "content": SYSTEM_PROMPT,
-                    },
-                    {
-                        "role": "user",
-                        "content": user_prompt,
-                    },
-                ],
-                response_format={"type": "json_object"},
-            )
-            content = response.output[0].content[0].text if response.output else "{}"
-            payload = json.loads(content)
+            raw_json, mode_reason = await self._llm_json_request(user_prompt)
+            cleaned = _clean_json_payload(raw_json)
+            try:
+                payload = json.loads(cleaned)
+            except json.JSONDecodeError:
+                payload = json.loads(_clean_json_payload(cleaned))
             score = float(payload.get("score", 0))
             rubric: Dict[str, Any] = payload.get("rubric") or default_rubric(category)
             feedback_markdown = payload.get("feedback_markdown") or "Keep practicing to improve your responses."
@@ -110,21 +421,66 @@ class LLMEvaluationService:
                 "Provide more concrete examples to back your answer.",
             ]
             readiness_tier = tier_for_score(score)
+            set_status(path="llm", reason=status_reason, model=EVAL_MODEL_NAME, mode=mode_reason, **self._status_context())
+            debug_payload = None
+            if settings.quality_debug_enabled:
+                debug_payload = {
+                    "path": "llm",
+                    "reason": status_reason,
+                    "mode": mode_reason,
+                    "code_score": code_score,
+                    "code_like": code_like,
+                    "debug_override": debug_override,
+                    "redacted": question_text != question_for_model or answer_text != answer_for_model,
+                }
+            logger.info(
+                "evaluation_path",
+                path="llm",
+                model=EVAL_MODEL_NAME,
+                score=score,
+                tier=readiness_tier.value,
+                reason=status_reason,
+                **self._log_context(),
+            )
+            meta = None
+            if status_reason == "debug_force_llm":
+                meta = {"mode": mode_reason}
             return EvaluationPayload(
                 score=score,
                 feedback_markdown=feedback_markdown,
                 rubric=rubric,
                 suggested_improvements=suggested_improvements[:3],
                 readiness_tier=readiness_tier,
-            )
-        except (OpenAIError, ValueError, KeyError, json.JSONDecodeError) as exc:
-            logger.error("llm_evaluation_failed", error=str(exc))
-            return self._offline_evaluation(
+                debug=debug_payload,
+            ), meta
+        except LLMQuotaError:
+            self._trigger_cooldown()
+            logger.warning("evaluation_path", path="heuristic", reason="llm_quota", **self._log_context())
+            set_status(path="heuristic", reason="llm_quota", model="offline-heuristic", **self._status_context())
+            payload = self._offline_evaluation(
                 answer_text=answer_text,
                 question_text=question_text,
                 category=category,
+                requires_code=requires_code,
                 keywords=question_keywords,
             )
+            meta = {
+                "fallback": "heuristic",
+                "reason": "llm_quota",
+                "message": "OpenAI quota exceeded; used offline evaluation.",
+            }
+            return payload, meta
+        except (OpenAIError, ValueError, KeyError, json.JSONDecodeError) as exc:
+            logger.warning("evaluation_path", path="heuristic", reason="llm_exception", error=str(exc), **self._log_context())
+            set_status(path="heuristic", reason="llm_exception", model="offline-heuristic", error=str(exc), **self._status_context())
+            payload = self._offline_evaluation(
+                answer_text=answer_text,
+                question_text=question_text,
+                category=category,
+                requires_code=requires_code,
+                keywords=question_keywords,
+            )
+            return payload, meta
 
     def _code_evaluation(
         self, *, answer_text: str, question_text: str, question_keywords: Optional[List[str]] = None
@@ -239,10 +595,17 @@ class LLMEvaluationService:
         answer_text: str,
         question_text: str,
         category: QuestionCategory,
+        requires_code: bool = False,
         keywords: Optional[List[str]] = None,
     ) -> EvaluationPayload:
         normalized = answer_text.strip()
         if not normalized:
+            debug_payload = None
+            if settings.quality_debug_enabled:
+                debug_payload = {
+                    "fallback": True,
+                    "reason": "empty_answer",
+                }
             return EvaluationPayload(
                 score=2.5,
                 feedback_markdown=(
@@ -254,6 +617,7 @@ class LLMEvaluationService:
                     "Reference the prompt directly and describe your approach step-by-step.",
                 ],
                 readiness_tier=tier_for_score(2.5),
+                debug=debug_payload,
             )
 
         lower_answer = normalized.lower()
@@ -273,6 +637,10 @@ class LLMEvaluationService:
         metrics_score = 1.0 if has_metrics else 0.0
         role_score = 1.0 if references_role else 0.3
         total_score = round(min(10.0, 2.0 + length_score + structure_score + metrics_score + role_score), 2)
+        code_tokens = ["def ", "class ", "return ", "lambda ", "yield "]
+        code_detected = requires_code or any(token in lower_answer for token in code_tokens)
+        if code_detected:
+            total_score = max(total_score, 6.0)
 
         rubric = default_rubric(category)
         for key in rubric:
@@ -326,19 +694,44 @@ class LLMEvaluationService:
             strength_lines.append("- Solid starting point. Build it out with more detail and measurable outcomes.")
         strength_lines.append(f"- Prompt emphasis: {focus_hint}")
         feedback_markdown = "\n".join(strength_lines)
+        debug_payload = None
+        if settings.quality_debug_enabled:
+            debug_payload = {
+                "fallback": True,
+                "reason": "heuristic_offline",
+                "weights": None,
+                "sampling": {
+                    "temperature": settings.eval_temperature,
+                    "top_p": settings.eval_top_p,
+                    "presence_penalty": settings.eval_presence_penalty,
+                    "frequency_penalty": settings.eval_frequency_penalty,
+                },
+                "metrics_detected": has_metrics,
+                "star_hits": star_hits,
+                "code_detected": code_detected,
+                "word_count": word_count,
+            }
+
         return EvaluationPayload(
             score=total_score,
             feedback_markdown=feedback_markdown,
             rubric=rubric,
             suggested_improvements=suggestions[:3],
             readiness_tier=tier_for_score(total_score),
+            debug=debug_payload,
         )
 
 
 def _should_use_stub() -> bool:
-    env_flag = (settings.app_env or "").lower()
-    if env_flag in {"test", "ci"}:
-        return True
-    if os.environ.get("CI", "").lower() == "true":
-        return True
-    return False
+    return not settings.use_llm
+
+
+
+
+
+
+
+
+
+
+

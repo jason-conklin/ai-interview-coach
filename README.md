@@ -106,12 +106,33 @@ black .              # formatting
 
 | Variable              | Location           | Description                                            |
 |-----------------------|--------------------|--------------------------------------------------------|
-| `OPENAI_API_KEY`      | backend `.env`     | Optional. Enables full LLM evaluation via OpenAI SDK.  |
-| `DATABASE_URL`        | backend `.env`     | Defaults to SQLite. Use `postgresql+psycopg://...`.     |
-| `APP_ENV`             | backend `.env`     | `development` or `production`.                         |
-| `VITE_API_BASE_URL`   | frontend `.env`    | Base URL for REST calls (default: local FastAPI).      |
+| `OPENAI_API_KEY`        | backend `.env`     | Optional. Enables full LLM evaluation via OpenAI SDK.                                 |
+| `LLM_PROVIDER`          | backend `.env`     | `"openai"` (default) or `"custom"` for LM Studio/Ollama style endpoints.              |
+| `LLM_BASE_URL`          | backend `.env`     | Base URL for the custom provider (e.g. `http://127.0.0.1:1234/v1`).                   |
+| `LLM_API_KEY`           | backend `.env`     | Optional key/token for the custom provider (falls back to `OPENAI_API_KEY`).          |
+| `DATABASE_URL`          | backend `.env`     | Defaults to SQLite. Use `postgresql+psycopg://...`.                                      |
+| `APP_ENV`               | backend `.env`     | `development`, `local`, `production`, or `ci`.                                         |
+| `EVAL_MODEL`            | backend `.env`     | Model alias passed to the provider (default: `gpt-4o-mini`).                           |
+| `EVAL_MAX_OUTPUT_TOKENS`| backend `.env`     | Max tokens returned from the evaluator (default: 256).                                  |
+| `EVAL_MAX_INPUT_CHARS`  | backend `.env`     | Max characters sent to the evaluator prompt (default: 4000).                           |
+| `EVAL_COOLDOWN_SECONDS` | backend `.env`     | Cooldown after quota errors before retrying the LLM (default: 300).                    |
+| `ALLOW_LLM_FOR_CODE`    | backend `.env`     | Allow LLM grading even when answers include code snippets (default: true).             |
+| `CODE_DETECTION_THRESHOLD` | backend `.env` | Heuristic score threshold for treating content as code when LLM-for-code is disabled.  |
+| `DEBUG_FORCE_LLM`       | backend `.env`     | Force LLM usage locally for a single evaluation (do not enable in production).         |
+| `VITE_API_BASE_URL`     | frontend `.env`    | Base URL for REST calls (default: local FastAPI).                                      |
 
 Without an `OPENAI_API_KEY`, the evaluation service falls back to a deterministic heuristic so the app remains usable offline.
+
+To evaluate against LM Studio or another OpenAI-compatible gateway, set:
+
+```
+LLM_PROVIDER=custom
+LLM_BASE_URL=http://127.0.0.1:1234/v1
+LLM_API_KEY=<optional token>
+EVAL_MODEL=<model name exposed by the gateway>
+```
+
+The backend logs and `/api/v1/diagnostics` endpoint will confirm which provider is active.
 
 ## CI/CD
 
@@ -141,9 +162,14 @@ Pre-commit (`.pre-commit-config.yaml`) mirrors these checks locally (`pre-commit
 - **Node 20 warning:** Vite 5 targets Node >=18.17. Warnings can appear on older Node 18 minors; upgrading to the latest LTS resolves them.
 - **Backend install fails:** Ensure Python 3.10+ and up-to-date pip (`python -m pip install --upgrade pip`).
 - **LLM errors:** Without an API key the evaluator logs a warning and falls back to heuristics. Supply a key to restore full AI feedback.
+- **Evaluator path unclear?** Call `GET /api/v1/diagnostics` to confirm the active path (`llm`, `llm_code_allowed`, `heuristic`, `code_question_forced`), then tail the backend logs for `evaluation_path=` entries.
 
 ## Contributing
 
 1. Fork & branch from `main`.
 2. Run `pre-commit run --all-files` before pushing.
 3. Open a PR with screenshots or recordings if the UI changes.
+
+
+
+
