@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from app.models.enums import QuestionCategory, SessionTier
 
@@ -24,6 +24,7 @@ Rubric expectations:
 
 Instructions:
 - Provide a clear numeric score from 0-10.
+- Do not execute or infer code execution. Evaluate clarity, correctness, trade-offs, and structure only when code snippets appear.
 - Offer concise, constructive feedback that is directly actionable.
 - Suggest up to three improvements tailored to the candidate's answer.
 - Do not make legal statements or guarantee hiring outcomes; instead, speak about readiness tiers.
@@ -38,6 +39,7 @@ class EvaluationPayload:
     rubric: Dict[str, Any]
     suggested_improvements: List[str]
     readiness_tier: SessionTier
+    debug: Optional[Dict[str, Any]] = None
 
 
 def default_rubric(category: QuestionCategory) -> Dict[str, Any]:
@@ -55,3 +57,4 @@ def default_rubric(category: QuestionCategory) -> Dict[str, Any]:
     else:
         base.update({"tools_processes": 0.0, "best_practices": 0.0, "practical_depth": 0.0})
     return base
+

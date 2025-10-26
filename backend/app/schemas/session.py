@@ -49,7 +49,12 @@ class RubricBreakdown(BaseModel):
 
 
 class EvaluationRequest(BaseModel):
-    answer_id: int
+    answer_id: int = Field(..., description="Identifier of the submitted answer.")
+    debug_force_llm: Optional[bool] = Field(
+        default=None,
+        description="Developer override to force LLM evaluation when APP_ENV is not production.",
+        examples=[True],
+    )
 
 
 class EvaluationRead(BaseModel):
@@ -64,6 +69,11 @@ class EvaluationRead(BaseModel):
     @computed_field(return_type=SessionTier)
     def readiness_tier(self) -> SessionTier:
         return tier_for_score(self.score)
+
+
+class EvaluationResponse(BaseModel):
+    evaluation: EvaluationRead
+    meta: Optional[Dict[str, Any]] = None
 
 
 class AnswerRead(BaseModel):

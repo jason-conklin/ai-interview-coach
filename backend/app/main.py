@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv  # NEW: load .env first
+load_dotenv()  # reads backend/.env when running locally
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -18,6 +21,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     configure_logging()
     logger.info("Starting AI Interview Coach backend")
+    logger.info("LLM enabled: %s (env: %s)", settings.use_llm, settings.app_env)
 
     engine, session_factory = create_engine_and_sessionmaker(settings.database_url)
     session_context.configure(session_factory=session_factory)
