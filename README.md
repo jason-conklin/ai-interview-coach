@@ -170,6 +170,19 @@ Pre-commit (`.pre-commit-config.yaml`) mirrors these checks locally (`pre-commit
 2. Run `pre-commit run --all-files` before pushing.
 3. Open a PR with screenshots or recordings if the UI changes.
 
+## Screenshots
+<img width="1254" height="942" alt="home_screen" src="https://github.com/user-attachments/assets/eaf0e74d-4ee3-44e8-be03-7b24da41c7cb" />
+Personalized landing screen
+Select interview level, role, and focus areas before starting a new mock session.
 
+<img width="1253" height="944" alt="interview_q2" src="https://github.com/user-attachments/assets/2d47072a-4e10-401f-a08c-3fecdcefccd7" />
+Technical prompt deep-dive
+Technical interview response with structured evaluation and coaching tips.
 
+<img width="1072" height="1026" alt="interview_recap" src="https://github.com/user-attachments/assets/d2a2473e-d203-4b60-8a58-870ea011a861" />
+Interview recap modal
+End-of-interview recap with aggregate scores and recommendations for next steps.
 
+<img width="1063" height="1596" alt="session_summary" src="https://github.com/user-attachments/assets/b9ba98fc-02cb-40b6-b4e9-5782ece659b2" />
+Session analytics dashboard
+Running summary of all mock interviews in the current session, highlighting trends.
